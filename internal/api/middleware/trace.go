@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -14,13 +15,13 @@ func TraceMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 生成traceId
 		traceId := uuid.New().String()
-		
+
 		// 将traceId添加到请求上下文
 		c.Set(TraceIdKey, traceId)
-		
+
 		// 将traceId添加到响应头
 		c.Header("X-Trace-Id", traceId)
-		
+
 		// 继续处理请求
 		c.Next()
 	}
