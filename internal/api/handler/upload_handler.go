@@ -251,6 +251,13 @@ func (h *UploadHandler) UploadReimbursement(c *gin.Context) {
 
 // UploadInvoices 处理发票图片上传
 func (h *UploadHandler) UploadInvoices(c *gin.Context) {
+
+	// 获取traceId
+	traceId := middleware.GetTraceId(c)
+
+	// 创建上下文，用于数据库操作
+	ctx := middleware.WithTraceId(context.Background(), traceId)
+
 	// 记录请求开始日志
 	middleware.LogInfo(c, "开始处理发票单文件上传请求",
 		"path", c.Request.URL.Path,
@@ -267,13 +274,29 @@ func (h *UploadHandler) UploadInvoices(c *gin.Context) {
 		return
 	}
 
+	// 从表单中获取reimbursement_id
+	reimbursementID := c.PostForm("reimbursement_id")
+	if reimbursementID == "" {
+		ErrorResponse(c, response.CodeInvalidParams, "缺少报销单ID reimbursement_id")
+		return
+	}
+
+	// 验证报销单是否存在
+	if _, err := h.reimbursementRepo.GetReimbursementByID(ctx, reimbursementID); err != nil {
+		middleware.LogError(c, "报销单不存在",
+			"error", err.Error(),
+			"reimbursement_id", reimbursementID)
+		ErrorResponse(c, response.CodeInvalidParams, "报销单不存在: "+err.Error())
+		return
+	}
+
 	middleware.LogDebug(c, "获取到上传文件",
 		"filename", file.Filename,
 		"size", file.Size,
 		"header", file.Header)
 
 	// 上传发票文件
-	fileInfo, err := h.fileService.UploadInvoice(c.Request.Context(), file)
+	fileInfo, err := h.fileService.UploadInvoice(ctx, file)
 	if err != nil {
 		middleware.LogError(c, "上传文件失败",
 			"error", err.Error(),
@@ -288,11 +311,12 @@ func (h *UploadHandler) UploadInvoices(c *gin.Context) {
 
 	// 创建发票记录
 	invoice := &reimbursement.Invoice{
-		ID:        fileInfo.ID,
-		ImagePath: fileInfo.Path,
-		Status:    "待识别", // 初始状态为待识别，等待OCR处理
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		ID:              fileInfo.ID,
+		ReimbursementID: reimbursementID,
+		ImagePath:       fileInfo.Path,
+		Status:          "待识别", // 初始状态为待识别，等待OCR处理
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
 	}
 
 	middleware.LogDebug(c, "创建发票记录",
@@ -301,7 +325,7 @@ func (h *UploadHandler) UploadInvoices(c *gin.Context) {
 
 	// 保存发票记录到数据库
 	if h.reimbursementRepo != nil {
-		if err := h.reimbursementRepo.CreateInvoice(c.Request.Context(), invoice); err != nil {
+		if err := h.reimbursementRepo.CreateInvoice(ctx, invoice); err != nil {
 			middleware.LogError(c, "保存发票记录到数据库失败",
 				"error", err.Error(),
 				"invoice_id", invoice.ID)
@@ -317,15 +341,18 @@ func (h *UploadHandler) UploadInvoices(c *gin.Context) {
 		"invoice_id", invoice.ID,
 		"image_path", invoice.ImagePath)
 
+	respData := response.NewInvoiceUploadResponse(
+		invoice.ID,
+		reimbursementID,
+		fileInfo.URL,
+		fileInfo.Size,
+		"待识别")
+
 	// 返回成功响应
 	middleware.LogInfo(c, "发票上传处理完成",
 		"invoice_id", invoice.ID)
-	SuccessResponse(c, gin.H{
-		"invoice_id":  invoice.ID,
-		"image_path":  invoice.ImagePath,
-		"file_url":    fileInfo.URL,
-		"upload_time": fileInfo.UploadedAt,
-	})
+
+	SuccessResponse(c, respData)
 }
 
 // BatchUpload 批量上传处理
@@ -335,6 +362,12 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 		"path", c.Request.URL.Path,
 		"method", c.Request.Method,
 		"remote_addr", c.ClientIP())
+
+	// 获取traceId
+	traceId := middleware.GetTraceId(c)
+
+	// 创建上下文，用于数据库操作
+	ctx := middleware.WithTraceId(context.Background(), traceId)
 
 	// 解析多文件上传
 	form, err := c.MultipartForm()
@@ -353,8 +386,25 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 		return
 	}
 
+	// 从表单中获取reimbursement_id
+	reimbursementID := c.PostForm("reimbursement_id")
+	if reimbursementID == "" {
+		ErrorResponse(c, response.CodeInvalidParams, "缺少报销单ID reimbursement_id")
+		return
+	}
+
+	// 验证报销单是否存在
+	if _, err := h.reimbursementRepo.GetReimbursementByID(ctx, reimbursementID); err != nil {
+		middleware.LogError(c, "报销单不存在",
+			"error", err.Error(),
+			"reimbursement_id", reimbursementID)
+		ErrorResponse(c, response.CodeInvalidParams, "报销单不存在: "+err.Error())
+		return
+	}
+
 	middleware.LogInfo(c, "获取到批量上传文件",
-		"file_count", len(files))
+		"file_count", len(files),
+		"reimbursement_id", reimbursementID)
 
 	// 限制批量上传数量
 	maxBatchSize := 10
@@ -366,12 +416,15 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 		return
 	}
 
-	// 处理结果
-	results := make([]gin.H, 0, len(files))
-	var successCount, failureCount int
+	// 生成批次ID
+	batchID := uuid.New().String()
+	middleware.LogDebug(c, "生成批次ID",
+		"batch_id", batchID)
 
 	// 存储成功上传的发票信息，用于批量保存
 	var successfulInvoices []*reimbursement.Invoice
+	var invoiceResponses []response.InvoiceUploadResponse
+	var errors []string
 
 	// 逐个处理文件上传
 	for _, fileHeader := range files {
@@ -380,18 +433,13 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 			"size", fileHeader.Size)
 
 		// 上传发票文件
-		fileInfo, err := h.fileService.UploadInvoice(c.Request.Context(), fileHeader)
+		fileInfo, err := h.fileService.UploadInvoice(ctx, fileHeader)
 		if err != nil {
 			middleware.LogError(c, "上传文件失败",
 				"error", err.Error(),
 				"filename", fileHeader.Filename)
-			// 记录失败信息
-			results = append(results, gin.H{
-				"filename": fileHeader.Filename,
-				"success":  false,
-				"error":    err.Error(),
-			})
-			failureCount++
+			// 记录错误信息
+			errors = append(errors, fmt.Sprintf("文件 %s 上传失败: %s", fileHeader.Filename, err.Error()))
 			continue
 		}
 
@@ -401,30 +449,31 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 
 		// 创建发票记录
 		invoice := &reimbursement.Invoice{
-			ID:        fileInfo.ID,
-			ImagePath: fileInfo.Path,
-			Status:    "待识别", // 初始状态为待识别，等待OCR处理
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
+			ID:              fileInfo.ID,
+			ReimbursementID: reimbursementID,
+			ImagePath:       fileInfo.Path,
+			Status:          "待识别", // 初始状态为待识别，等待OCR处理
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
 		}
 
 		// 添加到成功列表，稍后批量保存
 		successfulInvoices = append(successfulInvoices, invoice)
 
-		// 记录成功信息（先不保存到数据库）
-		results = append(results, gin.H{
-			"filename":   fileHeader.Filename,
-			"success":    true,
-			"invoice_id": invoice.ID,
-			"image_path": invoice.ImagePath,
-			"file_url":   fileInfo.URL,
-		})
-		successCount++
+		// 创建发票响应
+		invoiceResponse := response.NewInvoiceUploadResponse(
+			invoice.ID,
+			reimbursementID,
+			fileInfo.Path,
+			fileInfo.Size,
+			"待识别",
+		)
+		invoiceResponses = append(invoiceResponses, *invoiceResponse)
 	}
 
 	middleware.LogInfo(c, "文件上传处理完成",
-		"success_count", successCount,
-		"failure_count", failureCount)
+		"success_count", len(successfulInvoices),
+		"failure_count", len(errors))
 
 	// 批量保存成功的发票记录到数据库
 	if len(successfulInvoices) > 0 {
@@ -432,19 +481,15 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 			"invoice_count", len(successfulInvoices))
 
 		if h.reimbursementRepo != nil {
-			if err := h.reimbursementRepo.CreateInvoices(c.Request.Context(), successfulInvoices); err != nil {
+			if err := h.reimbursementRepo.CreateInvoices(ctx, successfulInvoices); err != nil {
 				middleware.LogError(c, "批量保存发票记录失败",
 					"error", err.Error(),
 					"invoice_count", len(successfulInvoices))
-				// 批量保存失败，需要将所有成功标记的记录改为失败
-				for i := range results {
-					if results[i]["success"].(bool) {
-						results[i]["success"] = false
-						results[i]["error"] = "批量保存发票记录失败: " + err.Error()
-					}
-				}
-				successCount = 0
-				failureCount = len(files)
+				// 批量保存失败，记录错误信息
+				errors = append(errors, fmt.Sprintf("批量保存发票记录失败: %s", err.Error()))
+				// 清空成功列表和响应
+				successfulInvoices = nil
+				invoiceResponses = nil
 			} else {
 				middleware.LogInfo(c, "批量保存发票记录成功",
 					"invoice_count", len(successfulInvoices))
@@ -455,15 +500,21 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 		}
 	}
 
+	// 创建批量上传响应
+	batchResponse := response.NewBatchUploadResponse(
+		batchID,
+		len(files),
+		len(successfulInvoices),
+		len(errors),
+	)
+	batchResponse.Invoices = invoiceResponses
+	batchResponse.Errors = errors
+
 	// 返回批量处理结果
 	middleware.LogInfo(c, "批量上传处理完成",
+		"batch_id", batchID,
 		"total", len(files),
-		"success_count", successCount,
-		"failure_count", failureCount)
-	SuccessResponse(c, gin.H{
-		"total":         len(files),
-		"success_count": successCount,
-		"failure_count": failureCount,
-		"results":       results,
-	})
+		"success_count", len(successfulInvoices),
+		"failure_count", len(errors))
+	SuccessResponse(c, batchResponse)
 }
