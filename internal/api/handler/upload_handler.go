@@ -11,19 +11,14 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 
 	"reimbursement-audit/internal/api/middleware"
 	"reimbursement-audit/internal/api/request"
 	"reimbursement-audit/internal/api/response"
-	"reimbursement-audit/internal/domain/reimbursement"
-	storage "reimbursement-audit/internal/infra/storage/file"
-	"reimbursement-audit/internal/infra/storage/mysql"
+	"reimbursement-audit/internal/application/service"
 )
 
 // JSONResponse 返回JSON响应的辅助函数
@@ -58,23 +53,13 @@ func SuccessResponse(c *gin.Context, data interface{}) {
 
 // UploadHandler 处理文件上传的结构体
 type UploadHandler struct {
-	reimbursementRepo reimbursement.Repository
-	mysqlClient       *mysql.Client
-	fileService       *storage.Service
+	reimbursementAppService *service.ReimbursementApplicationService
 }
 
 // NewUploadHandler 创建上传处理器实例
-func NewUploadHandler(mysqlClient *mysql.Client, fileService *storage.Service) *UploadHandler {
-	// 创建报销单仓储实例
-	var reimbursementRepo reimbursement.Repository
-	if mysqlClient != nil {
-		reimbursementRepo = mysql.NewReimbursementRepository(mysqlClient)
-	}
-
+func NewUploadHandler(reimbursementAppService *service.ReimbursementApplicationService) *UploadHandler {
 	return &UploadHandler{
-		reimbursementRepo: reimbursementRepo,
-		mysqlClient:       mysqlClient,
-		fileService:       fileService,
+		reimbursementAppService: reimbursementAppService,
 	}
 }
 
@@ -129,140 +114,37 @@ func (h *UploadHandler) UploadReimbursement(c *gin.Context) {
 		}
 	}
 
-	// 清理和标准化请求数据
-	req.Sanitize()
-
-	// 校验请求数据
-	if err := req.Validate(); err != nil {
-		// 记录参数校验错误日志
-		middleware.LogError(c, "请求参数校验失败",
+	// 调用应用服务处理业务逻辑
+	result, err := h.reimbursementAppService.CreateReimbursement(ctx, &req)
+	if err != nil {
+		middleware.LogError(c, "创建报销单失败",
 			"error", err.Error(),
 			"user_id", req.UserID,
-			"total_amount", req.TotalAmount,
 			"context", ctx)
-		// 返回校验错误响应
-		ErrorResponse(c, response.CodeInvalidParams, "参数校验失败: "+err.Error())
+		ErrorResponse(c, response.CodeInternalError, err.Error())
 		return
 	}
-
-	// 生成报销单UUID
-	reimbursementID := uuid.New().String()
-	middleware.LogDebug(c, "生成报销单UUID",
-		"reimbursement_id", reimbursementID,
-		"user_id", req.UserID,
-		"total_amount", req.TotalAmount)
-
-	// 解析日期字段
-	var applyDate, expenseDate time.Time
-	var err error
-
-	// 如果提供了申请日期，解析它
-	if req.ApplyDate != "" {
-		middleware.LogDebug(c, "解析申请日期",
-			"apply_date", req.ApplyDate)
-		applyDate, err = time.Parse("2006-01-02", req.ApplyDate)
-		if err != nil {
-			middleware.LogError(c, "申请日期解析失败",
-				"error", err.Error(),
-				"apply_date", req.ApplyDate)
-			ErrorResponse(c, response.CodeInvalidParams, "申请日期格式不正确，应为YYYY-MM-DD")
-			return
-		}
-	} else {
-		// 如果没有提供申请日期，使用当前日期
-		applyDate = time.Now()
-		middleware.LogDebug(c, "使用当前日期作为申请日期")
-	}
-
-	// 如果提供了费用发生日期，解析它
-	if req.ExpenseDate != "" {
-		middleware.LogDebug(c, "解析费用发生日期",
-			"expense_date", req.ExpenseDate)
-		expenseDate, err = time.Parse("2006-01-02", req.ExpenseDate)
-		if err != nil {
-			middleware.LogError(c, "费用发生日期解析失败",
-				"error", err.Error(),
-				"expense_date", req.ExpenseDate)
-			ErrorResponse(c, response.CodeInvalidParams, "费用发生日期格式不正确，应为YYYY-MM-DD")
-			return
-		}
-	} else {
-		// 如果没有提供费用发生日期，使用申请日期
-		expenseDate = applyDate
-		middleware.LogDebug(c, "使用申请日期作为费用发生日期")
-	}
-
-	// 创建报销单领域模型
-	now := time.Now()
-	reimbursementModel := &reimbursement.Reimbursement{
-		ID:          reimbursementID,
-		UserID:      req.UserID,
-		UserName:    req.UserName,
-		Department:  req.Department,
-		Type:        req.Category, // 使用Category作为Type
-		Title:       req.Reason,   // 使用Reason作为Title
-		Description: req.Description,
-		TotalAmount: req.TotalAmount,
-		Currency:    "CNY", // 默认使用人民币
-		ApplyDate:   applyDate,
-		ExpenseDate: expenseDate,
-		Status:      "待提交", // 初始状态为"待提交"
-		CreatedAt:   now,
-		UpdatedAt:   now,
-	}
-
-	middleware.LogDebug(c, "创建报销单模型",
-		"reimbursement_id", reimbursementID,
-		"user_id", req.UserID,
-		"total_amount", req.TotalAmount,
-		"status", "待提交")
-
-	// 保存报销单到数据库
-	if err := h.reimbursementRepo.CreateReimbursement(ctx, reimbursementModel); err != nil {
-		middleware.LogError(c, "保存报销单到数据库失败",
-			"error", err.Error(),
-			"reimbursement_id", reimbursementID)
-		// 返回数据库错误响应
-		ErrorResponse(c, response.CodeInternalError, "保存报销单失败: "+err.Error())
-		return
-	}
-
-	middleware.LogInfo(c, "报销单保存成功",
-		"reimbursement_id", reimbursementID,
-		"user_id", req.UserID)
-
-	// 创建响应数据
-	respData := response.NewReimbursementUploadResponse(
-		reimbursementID,
-		req.UserID,
-		req.UserName,
-		req.Category,
-		req.TotalAmount,
-		"待提交",
-		now,
-	)
 
 	// 返回成功响应
 	middleware.LogInfo(c, "报销单上传处理完成",
-		"reimbursement_id", reimbursementID,
+		"reimbursement_id", result.ReimbursementID,
 		"user_id", req.UserID)
-	SuccessResponse(c, respData)
+	SuccessResponse(c, result)
 }
 
 // UploadInvoices 处理发票图片上传
 func (h *UploadHandler) UploadInvoices(c *gin.Context) {
+	// 记录请求开始日志
+	middleware.LogInfo(c, "开始处理发票单文件上传请求",
+		"path", c.Request.URL.Path,
+		"method", c.Request.Method,
+		"remote_addr", c.ClientIP())
 
 	// 获取traceId
 	traceId := middleware.GetTraceId(c)
 
 	// 创建上下文，用于数据库操作
 	ctx := middleware.WithTraceId(context.Background(), traceId)
-
-	// 记录请求开始日志
-	middleware.LogInfo(c, "开始处理发票单文件上传请求",
-		"path", c.Request.URL.Path,
-		"method", c.Request.Method,
-		"remote_addr", c.ClientIP())
 
 	// 从请求中获取文件
 	file, err := c.FormFile("invoice")
@@ -281,78 +163,23 @@ func (h *UploadHandler) UploadInvoices(c *gin.Context) {
 		return
 	}
 
-	// 验证报销单是否存在
-	if _, err := h.reimbursementRepo.GetReimbursementByID(ctx, reimbursementID); err != nil {
-		middleware.LogError(c, "报销单不存在",
-			"error", err.Error(),
-			"reimbursement_id", reimbursementID)
-		ErrorResponse(c, response.CodeInvalidParams, "报销单不存在: "+err.Error())
-		return
-	}
-
-	middleware.LogDebug(c, "获取到上传文件",
-		"filename", file.Filename,
-		"size", file.Size,
-		"header", file.Header)
-
-	// 上传发票文件
-	fileInfo, err := h.fileService.UploadInvoice(ctx, file)
+	// 调用应用服务处理业务逻辑
+	result, err := h.reimbursementAppService.UploadInvoice(ctx, reimbursementID, file)
 	if err != nil {
-		middleware.LogError(c, "上传文件失败",
+		middleware.LogError(c, "上传发票失败",
 			"error", err.Error(),
-			"filename", file.Filename)
-		ErrorResponse(c, response.CodeInternalError, "上传文件失败: "+err.Error())
+			"reimbursement_id", reimbursementID,
+			"filename", file.Filename,
+			"context", ctx)
+		ErrorResponse(c, response.CodeInternalError, err.Error())
 		return
 	}
-
-	middleware.LogDebug(c, "文件上传成功",
-		"file_id", fileInfo.ID,
-		"file_path", fileInfo.Path)
-
-	// 创建发票记录
-	invoice := &reimbursement.Invoice{
-		ID:              fileInfo.ID,
-		ReimbursementID: reimbursementID,
-		ImagePath:       fileInfo.Path,
-		Status:          "待识别", // 初始状态为待识别，等待OCR处理
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
-	}
-
-	middleware.LogDebug(c, "创建发票记录",
-		"invoice_id", invoice.ID,
-		"status", invoice.Status)
-
-	// 保存发票记录到数据库
-	if h.reimbursementRepo != nil {
-		if err := h.reimbursementRepo.CreateInvoice(ctx, invoice); err != nil {
-			middleware.LogError(c, "保存发票记录到数据库失败",
-				"error", err.Error(),
-				"invoice_id", invoice.ID)
-			ErrorResponse(c, response.CodeInternalError, "保存发票记录失败: "+err.Error())
-			return
-		}
-	} else {
-		middleware.LogDebug(c, "跳过数据库保存，因为repository为空",
-			"invoice_id", invoice.ID)
-	}
-
-	middleware.LogInfo(c, "发票记录保存成功",
-		"invoice_id", invoice.ID,
-		"image_path", invoice.ImagePath)
-
-	respData := response.NewInvoiceUploadResponse(
-		invoice.ID,
-		reimbursementID,
-		fileInfo.URL,
-		fileInfo.Size,
-		"待识别")
 
 	// 返回成功响应
 	middleware.LogInfo(c, "发票上传处理完成",
-		"invoice_id", invoice.ID)
-
-	SuccessResponse(c, respData)
+		"invoice_id", result.InvoiceID,
+		"reimbursement_id", reimbursementID)
+	SuccessResponse(c, result)
 }
 
 // BatchUpload 批量上传处理
@@ -393,128 +220,29 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 		return
 	}
 
-	// 验证报销单是否存在
-	if _, err := h.reimbursementRepo.GetReimbursementByID(ctx, reimbursementID); err != nil {
-		middleware.LogError(c, "报销单不存在",
+	// 调用应用服务处理业务逻辑
+	// 转换文件类型以匹配应用服务接口
+	fileHeaders := make([]interface{}, len(files))
+	for i, file := range files {
+		fileHeaders[i] = file
+	}
+
+	result, err := h.reimbursementAppService.BatchUploadInvoices(ctx, reimbursementID, fileHeaders)
+	if err != nil {
+		middleware.LogError(c, "批量上传发票失败",
 			"error", err.Error(),
-			"reimbursement_id", reimbursementID)
-		ErrorResponse(c, response.CodeInvalidParams, "报销单不存在: "+err.Error())
-		return
-	}
-
-	middleware.LogInfo(c, "获取到批量上传文件",
-		"file_count", len(files),
-		"reimbursement_id", reimbursementID)
-
-	// 限制批量上传数量
-	maxBatchSize := 10
-	if len(files) > maxBatchSize {
-		middleware.LogWarn(c, "批量上传文件数量超过限制",
+			"reimbursement_id", reimbursementID,
 			"file_count", len(files),
-			"max_batch_size", maxBatchSize)
-		ErrorResponse(c, response.CodeInvalidParams, fmt.Sprintf("批量上传文件数量不能超过%d个", maxBatchSize))
+			"context", ctx)
+		ErrorResponse(c, response.CodeInternalError, err.Error())
 		return
 	}
 
-	// 生成批次ID
-	batchID := uuid.New().String()
-	middleware.LogDebug(c, "生成批次ID",
-		"batch_id", batchID)
-
-	// 存储成功上传的发票信息，用于批量保存
-	var successfulInvoices []*reimbursement.Invoice
-	var invoiceResponses []response.InvoiceUploadResponse
-	var errors []string
-
-	// 逐个处理文件上传
-	for _, fileHeader := range files {
-		middleware.LogDebug(c, "处理上传文件",
-			"filename", fileHeader.Filename,
-			"size", fileHeader.Size)
-
-		// 上传发票文件
-		fileInfo, err := h.fileService.UploadInvoice(ctx, fileHeader)
-		if err != nil {
-			middleware.LogError(c, "上传文件失败",
-				"error", err.Error(),
-				"filename", fileHeader.Filename)
-			// 记录错误信息
-			errors = append(errors, fmt.Sprintf("文件 %s 上传失败: %s", fileHeader.Filename, err.Error()))
-			continue
-		}
-
-		middleware.LogDebug(c, "文件上传成功",
-			"filename", fileHeader.Filename,
-			"file_id", fileInfo.ID)
-
-		// 创建发票记录
-		invoice := &reimbursement.Invoice{
-			ID:              fileInfo.ID,
-			ReimbursementID: reimbursementID,
-			ImagePath:       fileInfo.Path,
-			Status:          "待识别", // 初始状态为待识别，等待OCR处理
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
-		}
-
-		// 添加到成功列表，稍后批量保存
-		successfulInvoices = append(successfulInvoices, invoice)
-
-		// 创建发票响应
-		invoiceResponse := response.NewInvoiceUploadResponse(
-			invoice.ID,
-			reimbursementID,
-			fileInfo.Path,
-			fileInfo.Size,
-			"待识别",
-		)
-		invoiceResponses = append(invoiceResponses, *invoiceResponse)
-	}
-
-	middleware.LogInfo(c, "文件上传处理完成",
-		"success_count", len(successfulInvoices),
-		"failure_count", len(errors))
-
-	// 批量保存成功的发票记录到数据库
-	if len(successfulInvoices) > 0 {
-		middleware.LogInfo(c, "开始批量保存发票记录",
-			"invoice_count", len(successfulInvoices))
-
-		if h.reimbursementRepo != nil {
-			if err := h.reimbursementRepo.CreateInvoices(ctx, successfulInvoices); err != nil {
-				middleware.LogError(c, "批量保存发票记录失败",
-					"error", err.Error(),
-					"invoice_count", len(successfulInvoices))
-				// 批量保存失败，记录错误信息
-				errors = append(errors, fmt.Sprintf("批量保存发票记录失败: %s", err.Error()))
-				// 清空成功列表和响应
-				successfulInvoices = nil
-				invoiceResponses = nil
-			} else {
-				middleware.LogInfo(c, "批量保存发票记录成功",
-					"invoice_count", len(successfulInvoices))
-			}
-		} else {
-			middleware.LogDebug(c, "跳过数据库保存，因为repository为空",
-				"invoice_count", len(successfulInvoices))
-		}
-	}
-
-	// 创建批量上传响应
-	batchResponse := response.NewBatchUploadResponse(
-		batchID,
-		len(files),
-		len(successfulInvoices),
-		len(errors),
-	)
-	batchResponse.Invoices = invoiceResponses
-	batchResponse.Errors = errors
-
-	// 返回批量处理结果
+	// 返回成功响应
 	middleware.LogInfo(c, "批量上传处理完成",
-		"batch_id", batchID,
-		"total", len(files),
-		"success_count", len(successfulInvoices),
-		"failure_count", len(errors))
-	SuccessResponse(c, batchResponse)
+		"batch_id", result.BatchID,
+		"total", result.TotalCount,
+		"success_count", result.SuccessCount,
+		"failure_count", result.FailedCount)
+	SuccessResponse(c, result)
 }

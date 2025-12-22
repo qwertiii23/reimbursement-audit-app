@@ -137,7 +137,7 @@ func Regex(pattern string) func(interface{}) error {
 func Custom(validate func(interface{}) bool, message string) func(interface{}) error {
 	return func(value interface{}) error {
 		if !validate(value) {
-			return fmt.Errorf(message)
+			return fmt.Errorf("%s", message)
 		}
 		return nil
 	}

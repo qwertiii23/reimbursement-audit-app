@@ -27,100 +27,6 @@ OCR 解析失败重试 / 降级处理；
 规则校验冲突处理（多规则命中时按优先级输出结果）；
 数据校验异常（如报销单格式错误、发票图片损坏）的友好响应。
 
-reimbursement-audit/
-├── cmd/                          // 程序入口
-│   └── api/                      // API服务入口
-│       └── main.go               // 初始化配置、启动Gin服务
-├── internal/                     // 私有核心代码（不可外部导入）
-│   ├── api/                      // API层：路由、控制器、请求响应
-│   │   ├── handler/              // 接口处理器（控制器）
-│   │   │   ├── upload_handler.go // 上传（报销单/发票）处理
-│   │   │   ├── audit_handler.go  // 审核触发处理
-│   │   │   ├── query_handler.go // 结果查询处理
-│   │   │   └── rule_handler.go   // 规则管理处理
-│   │   ├── middleware/           // 中间件
-│   │   │   ├── logger.go         // 日志中间件
-│   │   │   ├── ratelimit.go      // 限流中间件
-│   │   │   └── auth.go           // 认证中间件（可选）
-│   │   ├── request/              // 请求结构体+参数校验
-│   │   │   ├── upload_request.go
-│   │   │   ├── audit_request.go
-│   │   │   └── rule_request.go
-│   │   ├── response/             // 响应结构体+统一返回
-│   │   │   ├── response.go       // 统一响应格式
-│   │   │   ├── code.go           // 错误码定义
-│   │   │   └── report.go         // 审核报告结构体
-│   │   └── router/               // 路由注册
-│   │       └── router.go         // 绑定接口与处理器
-│   ├── config/                   // 配置管理
-│   │   ├── config.go             // 配置结构体（数据库、大模型、存储等）
-│   │   └── loader.go             // 配置加载（yaml+环境变量）
-│   ├── domain/                   // 领域层：核心业务逻辑
-│   │   ├── reimbursement/        // 报销单领域
-│   │   │   ├── service.go        // 审核流程编排逻辑
-│   │   │   ├── parser.go         // 报销单/OCR解析逻辑
-│   │   │   └── model.go          // 领域模型（报销单、审核结果）
-│   │   ├── rule/                 // 规则引擎领域
-│   │   │   ├── service.go        // 规则校验逻辑
-│   │   │   ├── grule_engine.go   // Grule引擎封装
-│   │   │   └── model.go          // 规则模型（规则定义、优先级）
-│   │   └── rag/                  // RAG大模型领域
-│   │       ├── service.go        // RAG+大模型交互逻辑
-│   │       ├── document_processor.go // 报销制度文档处理（解析+分片）
-│   │       ├── vector_store.go   // PGVector检索封装
-│   │       ├── prompt_builder.go // Prompt构造逻辑
-│   │       └── model.go          // RAG相关模型（向量数据、Prompt）
-│   ├── infra/                    // 基础设施层：外部依赖实现
-│   │   ├── storage/              // 存储实现
-│   │   │   ├── postgres/         // PostgreSQL客户端（含PGVector）
-│   │   │   │   ├── client.go     // 数据库连接封装
-│   │   │   │   ├── migration/    // 数据库迁移文件（表结构初始化）
-│   │   │   │   └── repo/         // 数据访问接口实现
-│   │   │   │       ├── reimbursement_repo.go
-│   │   │   │       ├── rule_repo.go
-│   │   │   │       └── document_repo.go
-│   │   │   ├── redis/            // Redis客户端（可选）
-│   │   │   │   └── client.go     // 缓存操作封装
-│   │   │   └── file/             // 文件存储实现
-│   │   │       ├── local.go      // 本地文件存储
-│   │   │       └── minio.go      // MinIO存储（可选）
-│   │   ├── external/             // 外部服务客户端
-│   │   │   ├── ocr_client.go     // OCR服务对接（第三方/OCR SDK）
-│   │   │   └── llm_client.go     // 大模型API客户端（智谱/文心一言）
-│   │   └── repo/                 // 仓储层接口定义
-│   │       ├── reimbursement_repo.go
-│   │       ├── rule_repo.go
-│   │       └── document_repo.go
-│   ├── pkg/                      // 内部通用工具
-│   │   ├── logger/               // 日志封装（zap）
-│   │   ├── validator/            // 自定义参数校验
-│   │   ├── embedder/             // 向量嵌入工具（如sentence-transformers-go）
-│   │   ├── errno/                // 自定义错误类型
-│   │   └── trace/                // 链路追踪（可选，jaeger）
-│   └── server/                   // 服务启动配置
-│       └── http.go               // Gin服务配置（端口、超时、中间件）
-├── pkg/                          // 公共库（可外部导入，本项目暂用内部pkg）
-├── api/                          // API定义
-│   └── swagger/                  // Swagger文档（接口注释生成）
-├── configs/                      // 配置文件
-│   ├── dev/
-│   │   └── app.yaml              // 开发环境配置（数据库、大模型API密钥等）
-│   └── prod/
-│       └── app.yaml              // 生产环境配置
-├── scripts/                      // 脚本
-│   ├── migrate.sh                // 数据库迁移脚本
-│   ├── build.sh                  // 编译脚本
-│   └── start.sh                  // 启动脚本
-├── test/                         // 测试用例
-│   ├── unit/                     // 单元测试（领域层核心逻辑）
-│   └── integration/              // 集成测试（接口+数据库）
-├── docs/                         // 项目文档（架构设计、规则说明、API文档）
-├── go.mod                        // Go Module依赖
-├── go.sum
-├── Makefile                      // 构建/测试/迁移命令封装
-└── README.md                     // 项目说明
-
-
 # 智能报销审核系统 - 开发任务清单（Go 后端）
 ## 一、前期准备（阶段0：第1周）
 ### 1. 环境与依赖搭建
@@ -146,11 +52,7 @@ reimbursement-audit/
   - 返回上传结果（upload_id、文件存储路径、关联状态）
 
 ### 模块2：数据解析模块（基础解析）
-- 2.1 报销单解析逻辑开发
-  - 解析 JSON 格式报销单，提取核心字段映射至结构体
-  - 处理表单录入数据，结构化存储至 reimbursements 表
-  - 解析失败返回明确错误（字段缺失、格式错误）
-- 2.2 OCR 基础解析集成（必选字段）
+- 2.1 OCR 基础解析集成（必选字段）
   - 对接 OCR 服务 API，传入发票图片路径
   - 解析发票核心信息（发票号、发票类型、开票方、开票日期、金额、税额、价税合计）
   - 存储 OCR 解析结果至 invoices.ocr_text，标记 is_valid 状态
@@ -346,3 +248,96 @@ reimbursement-audit/
 - 3.2 文档完善：更新接口文档、部署手册、测试报告
 - 3.3 环境配置导出：整理开发/生产环境配置文件
 
+
+reimbursement-audit/
+├── cmd/                          // 程序入口
+│   └── api/                      // API服务入口
+│       └── main.go               // 初始化配置、启动Gin服务
+├── internal/                     // 私有核心代码（不可外部导入）
+│   ├── api/                      // API层：路由、控制器、请求响应
+│   │   ├── handler/              // 接口处理器（控制器）
+│   │   │   ├── upload_handler.go // 上传（报销单/发票）处理
+│   │   │   ├── audit_handler.go  // 审核触发处理
+│   │   │   ├── query_handler.go // 结果查询处理
+│   │   │   └── rule_handler.go   // 规则管理处理
+│   │   ├── middleware/           // 中间件
+│   │   │   ├── logger.go         // 日志中间件
+│   │   │   ├── ratelimit.go      // 限流中间件
+│   │   │   └── auth.go           // 认证中间件（可选）
+│   │   ├── request/              // 请求结构体+参数校验
+│   │   │   ├── upload_request.go
+│   │   │   ├── audit_request.go
+│   │   │   └── rule_request.go
+│   │   ├── response/             // 响应结构体+统一返回
+│   │   │   ├── response.go       // 统一响应格式
+│   │   │   ├── code.go           // 错误码定义
+│   │   │   └── report.go         // 审核报告结构体
+│   │   └── router/               // 路由注册
+│   │       └── router.go         // 绑定接口与处理器
+│   ├── config/                   // 配置管理
+│   │   ├── config.go             // 配置结构体（数据库、大模型、存储等）
+│   │   └── loader.go             // 配置加载（yaml+环境变量）
+│   ├── domain/                   // 领域层：核心业务逻辑
+│   │   ├── reimbursement/        // 报销单领域
+│   │   │   ├── service.go        // 审核流程编排逻辑
+│   │   │   ├── parser.go         // 报销单/OCR解析逻辑
+│   │   │   └── model.go          // 领域模型（报销单、审核结果）
+│   │   ├── rule/                 // 规则引擎领域
+│   │   │   ├── service.go        // 规则校验逻辑
+│   │   │   ├── grule_engine.go   // Grule引擎封装
+│   │   │   └── model.go          // 规则模型（规则定义、优先级）
+│   │   └── rag/                  // RAG大模型领域
+│   │       ├── service.go        // RAG+大模型交互逻辑
+│   │       ├── document_processor.go // 报销制度文档处理（解析+分片）
+│   │       ├── vector_store.go   // PGVector检索封装
+│   │       ├── prompt_builder.go // Prompt构造逻辑
+│   │       └── model.go          // RAG相关模型（向量数据、Prompt）
+│   ├── infra/                    // 基础设施层：外部依赖实现
+│   │   ├── storage/              // 存储实现
+│   │   │   ├── postgres/         // PostgreSQL客户端（含PGVector）
+│   │   │   │   ├── client.go     // 数据库连接封装
+│   │   │   │   ├── migration/    // 数据库迁移文件（表结构初始化）
+│   │   │   │   └── repo/         // 数据访问接口实现
+│   │   │   │       ├── reimbursement_repo.go
+│   │   │   │       ├── rule_repo.go
+│   │   │   │       └── document_repo.go
+│   │   │   ├── redis/            // Redis客户端（可选）
+│   │   │   │   └── client.go     // 缓存操作封装
+│   │   │   └── file/             // 文件存储实现
+│   │   │       ├── local.go      // 本地文件存储
+│   │   │       └── minio.go      // MinIO存储（可选）
+│   │   ├── external/             // 外部服务客户端
+│   │   │   ├── ocr_client.go     // OCR服务对接（第三方/OCR SDK）
+│   │   │   └── llm_client.go     // 大模型API客户端（智谱/文心一言）
+│   │   └── repo/                 // 仓储层接口定义
+│   │       ├── reimbursement_repo.go
+│   │       ├── rule_repo.go
+│   │       └── document_repo.go
+│   ├── pkg/                      // 内部通用工具
+│   │   ├── logger/               // 日志封装（zap）
+│   │   ├── validator/            // 自定义参数校验
+│   │   ├── embedder/             // 向量嵌入工具（如sentence-transformers-go）
+│   │   ├── errno/                // 自定义错误类型
+│   │   └── trace/                // 链路追踪（可选，jaeger）
+│   └── server/                   // 服务启动配置
+│       └── http.go               // Gin服务配置（端口、超时、中间件）
+├── pkg/                          // 公共库（可外部导入，本项目暂用内部pkg）
+├── api/                          // API定义
+│   └── swagger/                  // Swagger文档（接口注释生成）
+├── configs/                      // 配置文件
+│   ├── dev/
+│   │   └── app.yaml              // 开发环境配置（数据库、大模型API密钥等）
+│   └── prod/
+│       └── app.yaml              // 生产环境配置
+├── scripts/                      // 脚本
+│   ├── migrate.sh                // 数据库迁移脚本
+│   ├── build.sh                  // 编译脚本
+│   └── start.sh                  // 启动脚本
+├── test/                         // 测试用例
+│   ├── unit/                     // 单元测试（领域层核心逻辑）
+│   └── integration/              // 集成测试（接口+数据库）
+├── docs/                         // 项目文档（架构设计、规则说明、API文档）
+├── go.mod                        // Go Module依赖
+├── go.sum
+├── Makefile                      // 构建/测试/迁移命令封装
+└── README.md                     // 项目说明

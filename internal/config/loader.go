@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/goccy/go-yaml"
 )
 
 // Loader 配置加载器结构体
@@ -56,9 +58,19 @@ func (l *Loader) LoadFromYAML() (*Config, error) {
 		return nil, fmt.Errorf("配置文件不存在: %s", l.path)
 	}
 
-	// TODO: 实现从YAML文件加载配置逻辑
-	// 现在返回错误，让系统使用默认配置
-	return nil, fmt.Errorf("YAML配置加载尚未实现")
+	// 读取YAML文件
+	data, err := os.ReadFile(l.path)
+	if err != nil {
+		return nil, fmt.Errorf("读取配置文件失败: %w", err)
+	}
+
+	// 解析YAML
+	config := &Config{}
+	if err := yaml.Unmarshal(data, config); err != nil {
+		return nil, fmt.Errorf("解析YAML配置失败: %w", err)
+	}
+
+	return config, nil
 }
 
 // LoadFromEnv 从环境变量加载配置
@@ -77,6 +89,17 @@ func (l *Loader) LoadFromEnv(config *Config) *Config {
 		}
 	}
 
+	// OCR配置
+	if secretID := os.Getenv("OCR_SECRET_ID"); secretID != "" {
+		config.OCR.SecretID = secretID
+	}
+	if secretKey := os.Getenv("OCR_SECRET_KEY"); secretKey != "" {
+		config.OCR.SecretKey = secretKey
+	}
+	if region := os.Getenv("OCR_REGION"); region != "" {
+		config.OCR.Region = region
+	}
+
 	return config
 }
 
@@ -87,56 +110,74 @@ func (l *Loader) GetConfig() *Config {
 
 // GetServerConfig 获取服务器配置
 func (l *Loader) GetServerConfig() ServerConfig {
-	// TODO: 实现获取服务器配置逻辑
-	return ServerConfig{}
+	if l.config == nil {
+		return ServerConfig{}
+	}
+	return l.config.Server
 }
 
 // GetDatabaseConfig 获取数据库配置
 func (l *Loader) GetDatabaseConfig() DatabaseConfig {
-	// TODO: 实现获取数据库配置逻辑
-	return DatabaseConfig{}
+	if l.config == nil {
+		return DatabaseConfig{}
+	}
+	return l.config.Database
 }
 
 // GetRedisConfig 获取Redis配置
 func (l *Loader) GetRedisConfig() RedisConfig {
-	// TODO: 实现获取Redis配置逻辑
-	return RedisConfig{}
+	if l.config == nil {
+		return RedisConfig{}
+	}
+	return l.config.Redis
 }
 
 // GetLLMConfig 获取大模型配置
 func (l *Loader) GetLLMConfig() LLMConfig {
-	// TODO: 实现获取大模型配置逻辑
-	return LLMConfig{}
+	if l.config == nil {
+		return LLMConfig{}
+	}
+	return l.config.LLM
 }
 
 // GetOCRConfig 获取OCR配置
 func (l *Loader) GetOCRConfig() OCRConfig {
-	// TODO: 实现获取OCR配置逻辑
-	return OCRConfig{}
+	if l.config == nil {
+		return OCRConfig{}
+	}
+	return l.config.OCR
 }
 
 // GetStorageConfig 获取存储配置
 func (l *Loader) GetStorageConfig() StorageConfig {
-	// TODO: 实现获取存储配置逻辑
-	return StorageConfig{}
+	if l.config == nil {
+		return StorageConfig{}
+	}
+	return l.config.Storage
 }
 
 // GetLoggerConfig 获取日志配置
 func (l *Loader) GetLoggerConfig() LoggerConfig {
-	// TODO: 实现获取日志配置逻辑
-	return LoggerConfig{}
+	if l.config == nil {
+		return LoggerConfig{}
+	}
+	return l.config.Logger
 }
 
 // GetSecurityConfig 获取安全配置
 func (l *Loader) GetSecurityConfig() SecurityConfig {
-	// TODO: 实现获取安全配置逻辑
-	return SecurityConfig{}
+	if l.config == nil {
+		return SecurityConfig{}
+	}
+	return l.config.Security
 }
 
 // GetAppConfig 获取应用配置
 func (l *Loader) GetAppConfig() AppConfig {
-	// TODO: 实现获取应用配置逻辑
-	return AppConfig{}
+	if l.config == nil {
+		return AppConfig{}
+	}
+	return l.config.App
 }
 
 // Reload 重新加载配置
@@ -171,6 +212,12 @@ func (l *Loader) getDefaultConfig() *Config {
 		Redis: RedisConfig{
 			Host: "localhost",
 			Port: 6379,
+		},
+		OCR: OCRConfig{
+			Provider:   "tencent",
+			Region:     "ap-beijing",
+			Timeout:    30,
+			MaxRetries: 3,
 		},
 		Logger: LoggerConfig{
 			Level: "info",

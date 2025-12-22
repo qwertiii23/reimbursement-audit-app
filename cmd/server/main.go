@@ -7,11 +7,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"reimbursement-audit/internal/config"
+	"reimbursement-audit/internal/server"
 	"runtime"
 	"syscall"
 	"time"
-	"reimbursement-audit/internal/config"
-	"reimbursement-audit/internal/server"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -61,6 +62,9 @@ func main() {
 
 	// 创建服务器
 	srv := server.NewServer(serverConfig)
+
+	// 设置应用配置
+	srv.SetAppConfig(cfg)
 
 	// 注册路由
 	srv.RegisterRoutes()

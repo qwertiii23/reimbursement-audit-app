@@ -11,9 +11,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
+
+	"reimbursement-audit/internal/domain/ocr"
 	"reimbursement-audit/internal/domain/reimbursement"
 	"reimbursement-audit/internal/infra/storage/mysql"
-	"time"
 
 	"gorm.io/gorm"
 )
@@ -46,7 +48,7 @@ func (m *MigrationManager) Up(ctx context.Context) error {
 	err := m.db.WithContext(ctx).AutoMigrate(
 		// 报销单相关模型
 		&reimbursement.Reimbursement{},
-		&reimbursement.Invoice{},
+		&ocr.Invoice{},
 		&reimbursement.AuditResult{},
 		&reimbursement.AuditStatus{},
 	)

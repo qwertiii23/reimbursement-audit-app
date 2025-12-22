@@ -8,6 +8,11 @@ import (
 
 	"reimbursement-audit/internal/api/handler"
 	"reimbursement-audit/internal/api/middleware"
+	"reimbursement-audit/internal/application/service"
+	"reimbursement-audit/internal/config"
+	"reimbursement-audit/internal/domain/ocr"
+	"reimbursement-audit/internal/domain/ocr/provider"
+	"reimbursement-audit/internal/domain/reimbursement"
 	storage "reimbursement-audit/internal/infra/storage/file"
 	mysqlRepo "reimbursement-audit/internal/infra/storage/mysql"
 	"reimbursement-audit/internal/pkg/logger"
@@ -17,9 +22,10 @@ import (
 
 // serverImpl 服务器实现
 type serverImpl struct {
-	config *Config
-	engine *gin.Engine
-	server *http.Server
+	config    *Config
+	appConfig *config.Config
+	engine    *gin.Engine
+	server    *http.Server
 }
 
 // Start 启动服务器
@@ -67,6 +73,11 @@ func (s *serverImpl) SetConfig(config *Config) {
 	gin.SetMode(config.Mode)
 }
 
+// SetAppConfig 设置应用配置
+func (s *serverImpl) SetAppConfig(appConfig *config.Config) {
+	s.appConfig = appConfig
+}
+
 // RegisterRoutes 注册路由
 func (s *serverImpl) RegisterRoutes() {
 	// 注册trace中间件，用于生成和传播traceId
@@ -97,8 +108,52 @@ func (s *serverImpl) RegisterRoutes() {
 	localStorage := storage.NewLocalStorage("./uploads", "http://localhost:8080/uploads")
 	fileService := storage.NewService(localStorage)
 
+	// 创建logger实例
+	loggerInstance, _ := logger.NewLogger(logger.DefaultConfig())
+
+	// 创建OCR服务
+	// 从配置中获取OCR配置
+	var ocrConfig ocr.Config
+	if s.appConfig != nil && s.appConfig.OCR.Provider != "" {
+		ocrConfig = ocr.Config{
+			SecretID:   s.appConfig.OCR.SecretID,
+			SecretKey:  s.appConfig.OCR.SecretKey,
+			Region:     s.appConfig.OCR.Region,
+			Timeout:    s.appConfig.OCR.Timeout,
+			MaxRetries: s.appConfig.OCR.MaxRetries,
+		}
+	} else {
+		// 使用默认配置
+		ocrConfig = ocr.Config{
+			SecretID:   "", // 需要从环境变量或配置文件中获取
+			SecretKey:  "", // 需要从环境变量或配置文件中获取
+			Region:     "ap-beijing",
+			Timeout:    30,
+			MaxRetries: 3,
+		}
+	}
+	ocrProvider := provider.NewTencentProvider(ocrConfig, loggerInstance)
+
+	reimbursementRepo := mysqlRepo.NewReimbursementRepository(mysqlClient, loggerInstance)
+
+	ocrRepo := mysqlRepo.NewOCRRepository(mysqlClient, loggerInstance)
+
+	// 创建领域服务
+	reimbursementDomainService := reimbursement.NewDomainService(reimbursementRepo, loggerInstance)
+	ocrDomainService := ocr.NewParserService(ocrProvider, ocrRepo, loggerInstance)
+
+	// 创建应用服务
+	reimbursementAppService := service.NewReimbursementApplicationService(
+		reimbursementRepo,
+		reimbursementDomainService,
+		ocrDomainService,
+		ocrRepo,
+		fileService,
+		loggerInstance,
+	)
+
 	// 创建上传处理器
-	uploadHandler := handler.NewUploadHandler(mysqlClient, fileService)
+	uploadHandler := handler.NewUploadHandler(reimbursementAppService)
 
 	// 注册上传相关路由
 	s.engine.POST("/api/v1/reimbursement/upload", uploadHandler.UploadReimbursement)

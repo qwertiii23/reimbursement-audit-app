@@ -62,6 +62,15 @@ storage:
     bucket: ""
     endpoint: ""
 
+# OCR配置
+ocr:
+  provider: "tencent"  # tencent
+  secret_id: "your-tencent-secret-id"     # 腾讯云SecretId
+  secret_key: "your-tencent-secret-key"    # 腾讯云SecretKey
+  region: "ap-beijing"                     # 腾讯云地域
+  timeout: 30                              # 超时时间(秒)
+  max_retries: 3                           # 最大重试次数
+
 # RAG配置
 rag:
   enabled: true

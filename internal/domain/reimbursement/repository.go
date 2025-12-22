@@ -1,3 +1,4 @@
+package reimbursement
 // repository.go 报销单仓储接口定义
 // 功能点：
 // 1. 定义报销单仓储接口
@@ -6,8 +7,6 @@
 // 4. 提供数据访问抽象层
 // 5. 支持事务管理
 // 6. 支持查询和分页
-
-package reimbursement
 
 import (
 	"context"
@@ -25,28 +24,20 @@ type Repository interface {
 	ListReimbursementsByStatus(ctx context.Context, status string, page, size int) ([]*Reimbursement, int64, error)
 	SearchReimbursements(ctx context.Context, keyword string, page, size int) ([]*Reimbursement, int64, error)
 
-	// 发票相关方法
-	CreateInvoice(ctx context.Context, invoice *Invoice) error
-	CreateInvoices(ctx context.Context, invoices []*Invoice) error
-	GetInvoiceByID(ctx context.Context, id string) (*Invoice, error)
-	UpdateInvoice(ctx context.Context, invoice *Invoice) error
-	DeleteInvoice(ctx context.Context, id string) error
-	ListInvoicesByReimbursementID(ctx context.Context, reimbursementID string) ([]*Invoice, error)
-
 	// 审核结果相关方法
-	CreateAuditResult(ctx context.Context, result *AuditResult) error
-	GetAuditResultByID(ctx context.Context, id string) (*AuditResult, error)
-	GetLatestAuditResultByReimbursementID(ctx context.Context, reimbursementID string) (*AuditResult, error)
-	UpdateAuditResult(ctx context.Context, result *AuditResult) error
-	ListAuditResultsByReimbursementID(ctx context.Context, reimbursementID string) ([]*AuditResult, error)
+	// CreateAuditResult(ctx context.Context, result *AuditResult) error
+	// GetAuditResultByID(ctx context.Context, id string) (*AuditResult, error)
+	// GetLatestAuditResultByReimbursementID(ctx context.Context, reimbursementID string) (*AuditResult, error)
+	// UpdateAuditResult(ctx context.Context, result *AuditResult) error
+	// ListAuditResultsByReimbursementID(ctx context.Context, reimbursementID string) ([]*AuditResult, error)
 
-	// 审核状态相关方法
-	CreateAuditStatus(ctx context.Context, status *AuditStatus) error
-	GetAuditStatusByReimbursementID(ctx context.Context, reimbursementID string) (*AuditStatus, error)
-	UpdateAuditStatus(ctx context.Context, status *AuditStatus) error
+	// // 审核状态相关方法
+	// CreateAuditStatus(ctx context.Context, status *AuditStatus) error
+	// GetAuditStatusByReimbursementID(ctx context.Context, reimbursementID string) (*AuditStatus, error)
+	// UpdateAuditStatus(ctx context.Context, status *AuditStatus) error
 
-	// 事务相关方法
-	BeginTx(ctx context.Context) (Tx, error)
+	// // 事务相关方法
+	// BeginTx(ctx context.Context) (Tx, error)
 }
 
 // Tx 事务接口
