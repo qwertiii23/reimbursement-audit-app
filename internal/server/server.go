@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reimbursement-audit/internal/config"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,8 @@ type Server interface {
 	GetConfig() *Config
 	// SetConfig 设置服务器配置
 	SetConfig(config *Config)
+	// SetAppConfig 设置应用配置
+	SetAppConfig(config *config.Config)
 	// RegisterRoutes 注册路由
 	RegisterRoutes()
 }
@@ -56,7 +59,7 @@ func (c *Config) Validate() error {
 	if c.Port <= 0 || c.Port > 65535 {
 		return fmt.Errorf("invalid port: %d", c.Port)
 	}
-	
+
 	if c.TLS {
 		if c.CertFile == "" {
 			return fmt.Errorf("cert file is required when TLS is enabled")
@@ -65,7 +68,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("key file is required when TLS is enabled")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -101,17 +104,17 @@ func NewServer(config *Config) Server {
 	if config == nil {
 		config = DefaultConfig()
 	}
-	
+
 	// 设置Gin模式
 	gin.SetMode(config.Mode)
-	
+
 	// 创建Gin引擎
 	engine := gin.New()
-	
+
 	// 添加中间件
 	engine.Use(gin.Logger())
 	engine.Use(gin.Recovery())
-	
+
 	return &serverImpl{
 		config: config,
 		engine: engine,
@@ -129,17 +132,17 @@ func RunServer(config *Config) error {
 func RunServerWithContext(ctx context.Context, config *Config) error {
 	server := NewServer(config)
 	server.RegisterRoutes()
-	
+
 	// 启动服务器
 	go func() {
 		if err := server.Start(); err != nil && err != http.ErrServerClosed {
 			panic(err)
 		}
 	}()
-	
+
 	// 等待上下文取消
 	<-ctx.Done()
-	
+
 	// 停止服务器
 	return server.Stop(context.Background())
 }

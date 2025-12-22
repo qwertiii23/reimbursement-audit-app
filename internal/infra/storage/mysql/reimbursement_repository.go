@@ -12,11 +12,10 @@ package mysql
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
-	"reimbursement-audit/internal/api/middleware"
 	"reimbursement-audit/internal/domain/reimbursement"
+	"reimbursement-audit/internal/pkg/logger"
 
 	"gorm.io/gorm"
 )
@@ -24,24 +23,23 @@ import (
 // ReimbursementRepository 报销单MySQL仓储实现
 type ReimbursementRepository struct {
 	client *Client
+	logger logger.Logger
 }
 
 // NewReimbursementRepository 创建报销单MySQL仓储实例
-func NewReimbursementRepository(client *Client) reimbursement.Repository {
-	return &ReimbursementRepository{
-		client: client,
-	}
+func NewReimbursementRepository(client *Client, logger logger.Logger) reimbursement.Repository {
+	return &ReimbursementRepository{client: client, logger: logger}
 }
 
 // CreateReimbursement 创建报销单
 func (r *ReimbursementRepository) CreateReimbursement(ctx context.Context, reimbursement *reimbursement.Reimbursement) error {
-	// 获取traceId用于日志追踪
-	traceId := middleware.GetTraceIdFromContext(ctx)
-
 	// 使用GORM创建报销单记录
 	result := r.client.GetDB().WithContext(ctx).Create(reimbursement)
 	if result.Error != nil {
-		return fmt.Errorf("创建报销单失败: %w, traceId: %s", result.Error, traceId)
+		r.logger.WithContext(ctx).Error("创建报销单失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("user_id", reimbursement.UserID))
+		return result.Error
 	}
 
 	return nil
@@ -55,17 +53,18 @@ func (r *ReimbursementRepository) GetReimbursementByID(ctx context.Context, id s
 	result := r.client.GetDB().WithContext(ctx).Where("id = ?", id).First(&reimbursement)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("报销单不存在")
+			r.logger.WithContext(ctx).Warn("报销单不存在",
+				logger.NewField("reimbursement_id", id))
+			return nil, result.Error
 		}
-		return nil, fmt.Errorf("获取报销单失败: %w", result.Error)
+		r.logger.WithContext(ctx).Error("获取报销单失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("reimbursement_id", id))
+		return nil, result.Error
 	}
 
-	// 获取关联的发票列表
-	invoices, err := r.ListInvoicesByReimbursementID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("获取报销单发票列表失败: %w", err)
-	}
-	reimbursement.Invoices = invoices
+	// 不在此处加载发票列表，保持聚合根的独立性
+	// 发票列表应由应用服务在需要时通过OCRRepository单独加载
 
 	return &reimbursement, nil
 }
@@ -91,11 +90,16 @@ func (r *ReimbursementRepository) UpdateReimbursement(ctx context.Context, reimb
 		})
 
 	if result.Error != nil {
-		return fmt.Errorf("更新报销单失败: %w", result.Error)
+		r.logger.WithContext(ctx).Error("更新报销单失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("reimbursement_id", reimbursement.ID))
+		return result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("报销单不存在")
+		r.logger.WithContext(ctx).Warn("报销单不存在，更新失败",
+			logger.NewField("reimbursement_id", reimbursement.ID))
+		return result.Error
 	}
 
 	return nil
@@ -107,11 +111,16 @@ func (r *ReimbursementRepository) DeleteReimbursement(ctx context.Context, id st
 	result := r.client.GetDB().WithContext(ctx).Where("id = ?", id).Delete(&reimbursement.Reimbursement{})
 
 	if result.Error != nil {
-		return fmt.Errorf("删除报销单失败: %w", result.Error)
+		r.logger.WithContext(ctx).Error("删除报销单失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("reimbursement_id", id))
+		return result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("报销单不存在")
+		r.logger.WithContext(ctx).Warn("报销单不存在，删除失败",
+			logger.NewField("reimbursement_id", id))
+		return result.Error
 	}
 
 	return nil
@@ -130,7 +139,12 @@ func (r *ReimbursementRepository) GetReimbursementsByUserID(ctx context.Context,
 		Find(&reimbursements)
 
 	if result.Error != nil {
-		return nil, fmt.Errorf("查询用户报销单失败: %w", result.Error)
+		r.logger.WithContext(ctx).Error("查询用户报销单失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("user_id", userID),
+			logger.NewField("limit", limit),
+			logger.NewField("offset", offset))
+		return nil, result.Error
 	}
 
 	return reimbursements, nil
@@ -142,7 +156,10 @@ func (r *ReimbursementRepository) ListReimbursementsByUserID(ctx context.Context
 	var total int64
 	countResult := r.client.GetDB().WithContext(ctx).Model(&reimbursement.Reimbursement{}).Where("user_id = ?", userID).Count(&total)
 	if countResult.Error != nil {
-		return nil, 0, fmt.Errorf("获取报销单总数失败: %w", countResult.Error)
+		r.logger.WithContext(ctx).Error("获取报销单总数失败",
+			logger.NewField("error", countResult.Error.Error()),
+			logger.NewField("user_id", userID))
+		return nil, 0, countResult.Error
 	}
 
 	// 获取分页数据
@@ -156,17 +173,16 @@ func (r *ReimbursementRepository) ListReimbursementsByUserID(ctx context.Context
 		Find(&reimbursements)
 
 	if result.Error != nil {
-		return nil, 0, fmt.Errorf("获取报销单列表失败: %w", result.Error)
+		r.logger.WithContext(ctx).Error("获取报销单列表失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("user_id", userID),
+			logger.NewField("page", page),
+			logger.NewField("size", size))
+		return nil, 0, result.Error
 	}
 
-	// 获取关联的发票列表
-	for _, reimbursement := range reimbursements {
-		invoices, err := r.ListInvoicesByReimbursementID(ctx, reimbursement.ID)
-		if err != nil {
-			return nil, 0, fmt.Errorf("获取报销单发票列表失败: %w", err)
-		}
-		reimbursement.Invoices = invoices
-	}
+	// 不在此处加载发票列表，保持聚合根的独立性
+	// 发票列表应由应用服务在需要时通过OCRRepository单独加载
 
 	return reimbursements, total, nil
 }
@@ -180,7 +196,11 @@ func (r *ReimbursementRepository) ListReimbursementsByDateRange(ctx context.Cont
 		Count(&total)
 
 	if countResult.Error != nil {
-		return nil, 0, fmt.Errorf("获取报销单总数失败: %w", countResult.Error)
+		r.logger.WithContext(ctx).Error("获取报销单总数失败",
+			logger.NewField("error", countResult.Error.Error()),
+			logger.NewField("start_date", startDate),
+			logger.NewField("end_date", endDate))
+		return nil, 0, countResult.Error
 	}
 
 	// 获取分页数据
@@ -194,17 +214,17 @@ func (r *ReimbursementRepository) ListReimbursementsByDateRange(ctx context.Cont
 		Find(&reimbursements)
 
 	if result.Error != nil {
-		return nil, 0, fmt.Errorf("获取报销单列表失败: %w", result.Error)
+		r.logger.WithContext(ctx).Error("获取报销单列表失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("start_date", startDate),
+			logger.NewField("end_date", endDate),
+			logger.NewField("page", page),
+			logger.NewField("size", size))
+		return nil, 0, result.Error
 	}
 
-	// 获取关联的发票列表
-	for _, reimbursement := range reimbursements {
-		invoices, err := r.ListInvoicesByReimbursementID(ctx, reimbursement.ID)
-		if err != nil {
-			return nil, 0, fmt.Errorf("获取报销单发票列表失败: %w", err)
-		}
-		reimbursement.Invoices = invoices
-	}
+	// 不在此处加载发票列表，保持聚合根的独立性
+	// 发票列表应由应用服务在需要时通过OCRRepository单独加载
 
 	return reimbursements, total, nil
 }
@@ -218,7 +238,10 @@ func (r *ReimbursementRepository) ListReimbursementsByStatus(ctx context.Context
 		Count(&total)
 
 	if countResult.Error != nil {
-		return nil, 0, fmt.Errorf("获取报销单总数失败: %w", countResult.Error)
+		r.logger.WithContext(ctx).Error("获取报销单总数失败",
+			logger.NewField("error", countResult.Error.Error()),
+			logger.NewField("status", status))
+		return nil, 0, countResult.Error
 	}
 
 	// 获取分页数据
@@ -232,17 +255,16 @@ func (r *ReimbursementRepository) ListReimbursementsByStatus(ctx context.Context
 		Find(&reimbursements)
 
 	if result.Error != nil {
-		return nil, 0, fmt.Errorf("获取报销单列表失败: %w", result.Error)
+		r.logger.WithContext(ctx).Error("获取报销单列表失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("status", status),
+			logger.NewField("page", page),
+			logger.NewField("size", size))
+		return nil, 0, result.Error
 	}
 
-	// 获取关联的发票列表
-	for _, reimbursement := range reimbursements {
-		invoices, err := r.ListInvoicesByReimbursementID(ctx, reimbursement.ID)
-		if err != nil {
-			return nil, 0, fmt.Errorf("获取报销单发票列表失败: %w", err)
-		}
-		reimbursement.Invoices = invoices
-	}
+	// 不在此处加载发票列表，保持聚合根的独立性
+	// 发票列表应由应用服务在需要时通过OCRRepository单独加载
 
 	return reimbursements, total, nil
 }
@@ -257,7 +279,10 @@ func (r *ReimbursementRepository) SearchReimbursements(ctx context.Context, keyw
 		Count(&total)
 
 	if countResult.Error != nil {
-		return nil, 0, fmt.Errorf("获取报销单总数失败: %w", countResult.Error)
+		r.logger.WithContext(ctx).Error("获取报销单总数失败",
+			logger.NewField("error", countResult.Error.Error()),
+			logger.NewField("keyword", keyword))
+		return nil, 0, countResult.Error
 	}
 
 	// 获取分页数据
@@ -271,193 +296,16 @@ func (r *ReimbursementRepository) SearchReimbursements(ctx context.Context, keyw
 		Find(&reimbursements)
 
 	if result.Error != nil {
-		return nil, 0, fmt.Errorf("获取报销单列表失败: %w", result.Error)
+		r.logger.WithContext(ctx).Error("获取报销单列表失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("keyword", keyword),
+			logger.NewField("page", page),
+			logger.NewField("size", size))
+		return nil, 0, result.Error
 	}
 
-	// 获取关联的发票列表
-	for _, reimbursement := range reimbursements {
-		invoices, err := r.ListInvoicesByReimbursementID(ctx, reimbursement.ID)
-		if err != nil {
-			return nil, 0, fmt.Errorf("获取报销单发票列表失败: %w", err)
-		}
-		reimbursement.Invoices = invoices
-	}
+	// 不在此处加载发票列表，保持聚合根的独立性
+	// 发票列表应由应用服务在需要时通过OCRRepository单独加载
 
 	return reimbursements, total, nil
-}
-
-// CreateInvoice 创建发票
-func (r *ReimbursementRepository) CreateInvoice(ctx context.Context, invoice *reimbursement.Invoice) error {
-	// 获取traceId用于日志追踪
-	traceId := middleware.GetTraceIdFromContext(ctx)
-
-	// 使用GORM创建发票记录
-	result := r.client.GetDB().WithContext(ctx).Create(invoice)
-	if result.Error != nil {
-		return fmt.Errorf("创建发票失败: %w, traceId: %s", result.Error, traceId)
-	}
-
-	return nil
-}
-
-// CreateInvoices 批量创建发票
-func (r *ReimbursementRepository) CreateInvoices(ctx context.Context, invoices []*reimbursement.Invoice) error {
-	if len(invoices) == 0 {
-		return nil
-	}
-
-	// 获取traceId用于日志追踪
-	traceId := middleware.GetTraceIdFromContext(ctx)
-
-	// 使用GORM批量创建发票记录
-	result := r.client.GetDB().WithContext(ctx).CreateInBatches(invoices, 100) // 每批最多100条
-	if result.Error != nil {
-		return fmt.Errorf("批量创建发票失败: %w, traceId: %s", result.Error, traceId)
-	}
-
-	return nil
-}
-
-// GetInvoiceByID 根据ID获取发票
-func (r *ReimbursementRepository) GetInvoiceByID(ctx context.Context, id string) (*reimbursement.Invoice, error) {
-	var invoice reimbursement.Invoice
-
-	// 使用GORM查询发票
-	result := r.client.GetDB().WithContext(ctx).Where("id = ?", id).First(&invoice)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("发票不存在")
-		}
-		return nil, fmt.Errorf("查询发票失败: %w", result.Error)
-	}
-
-	return &invoice, nil
-}
-
-// UpdateInvoice 更新发票
-func (r *ReimbursementRepository) UpdateInvoice(ctx context.Context, invoice *reimbursement.Invoice) error {
-	// 使用GORM更新发票
-	result := r.client.GetDB().WithContext(ctx).Model(invoice).
-		Where("id = ?", invoice.ID).
-		Updates(map[string]interface{}{
-			"reimbursement_id": invoice.ReimbursementID,
-			"type":             invoice.Type,
-			"code":             invoice.Code,
-			"number":           invoice.Number,
-			"date":             invoice.Date,
-			"amount":           invoice.Amount,
-			"tax_amount":       invoice.TaxAmount,
-			"payer":            invoice.Payer,
-			"payee":            invoice.Payee,
-			"buyer_name":       invoice.BuyerName,
-			"buyer_tax_no":     invoice.BuyerTaxNo,
-			"seller_name":      invoice.SellerName,
-			"seller_tax_no":    invoice.SellerTaxNo,
-			"commodity_name":   invoice.CommodityName,
-			"specification":    invoice.Specification,
-			"unit":             invoice.Unit,
-			"quantity":         invoice.Quantity,
-			"price":            invoice.Price,
-			"image_path":       invoice.ImagePath,
-			"ocr_result":       invoice.OCRResult,
-			"status":           invoice.Status,
-			"updated_at":       invoice.UpdatedAt,
-		})
-
-	if result.Error != nil {
-		return fmt.Errorf("更新发票失败: %w", result.Error)
-	}
-
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("发票不存在")
-	}
-
-	return nil
-}
-
-// DeleteInvoice 删除发票
-func (r *ReimbursementRepository) DeleteInvoice(ctx context.Context, id string) error {
-	// 使用GORM删除发票
-	result := r.client.GetDB().WithContext(ctx).Where("id = ?", id).Delete(&reimbursement.Invoice{})
-
-	if result.Error != nil {
-		return fmt.Errorf("删除发票失败: %w", result.Error)
-	}
-
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("发票不存在")
-	}
-
-	return nil
-}
-
-// ListInvoicesByReimbursementID 根据报销单ID获取发票列表
-func (r *ReimbursementRepository) ListInvoicesByReimbursementID(ctx context.Context, reimbursementID string) ([]*reimbursement.Invoice, error) {
-	var invoices []*reimbursement.Invoice
-
-	// 使用GORM查询发票列表
-	result := r.client.GetDB().WithContext(ctx).
-		Where("reimbursement_id = ?", reimbursementID).
-		Order("created_at ASC").
-		Find(&invoices)
-
-	if result.Error != nil {
-		return nil, fmt.Errorf("获取发票列表失败: %w", result.Error)
-	}
-
-	return invoices, nil
-}
-
-// CreateAuditResult 创建审核结果
-func (r *ReimbursementRepository) CreateAuditResult(ctx context.Context, result *reimbursement.AuditResult) error {
-	// TODO: 实现创建审核结果逻辑
-	return nil
-}
-
-// GetAuditResultByID 根据ID获取审核结果
-func (r *ReimbursementRepository) GetAuditResultByID(ctx context.Context, id string) (*reimbursement.AuditResult, error) {
-	// TODO: 实现获取审核结果逻辑
-	return nil, nil
-}
-
-// GetLatestAuditResultByReimbursementID 根据报销单ID获取最新审核结果
-func (r *ReimbursementRepository) GetLatestAuditResultByReimbursementID(ctx context.Context, reimbursementID string) (*reimbursement.AuditResult, error) {
-	// TODO: 实现获取最新审核结果逻辑
-	return nil, nil
-}
-
-// UpdateAuditResult 更新审核结果
-func (r *ReimbursementRepository) UpdateAuditResult(ctx context.Context, result *reimbursement.AuditResult) error {
-	// TODO: 实现更新审核结果逻辑
-	return nil
-}
-
-// ListAuditResultsByReimbursementID 根据报销单ID获取审核结果列表
-func (r *ReimbursementRepository) ListAuditResultsByReimbursementID(ctx context.Context, reimbursementID string) ([]*reimbursement.AuditResult, error) {
-	// TODO: 实现获取审核结果列表逻辑
-	return nil, nil
-}
-
-// CreateAuditStatus 创建审核状态
-func (r *ReimbursementRepository) CreateAuditStatus(ctx context.Context, status *reimbursement.AuditStatus) error {
-	// TODO: 实现创建审核状态逻辑
-	return nil
-}
-
-// GetAuditStatusByReimbursementID 根据报销单ID获取审核状态
-func (r *ReimbursementRepository) GetAuditStatusByReimbursementID(ctx context.Context, reimbursementID string) (*reimbursement.AuditStatus, error) {
-	// TODO: 实现获取审核状态逻辑
-	return nil, nil
-}
-
-// UpdateAuditStatus 更新审核状态
-func (r *ReimbursementRepository) UpdateAuditStatus(ctx context.Context, status *reimbursement.AuditStatus) error {
-	// TODO: 实现更新审核状态逻辑
-	return nil
-}
-
-// BeginTx 开始事务
-func (r *ReimbursementRepository) BeginTx(ctx context.Context) (reimbursement.Tx, error) {
-	// TODO: 实现开始事务逻辑
-	return nil, nil
 }

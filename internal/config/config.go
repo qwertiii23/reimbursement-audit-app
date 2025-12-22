@@ -66,10 +66,12 @@ type LLMConfig struct {
 
 // OCRConfig OCR配置
 type OCRConfig struct {
-	Provider string `json:"provider" yaml:"provider"` // OCR提供商
-	APIKey   string `json:"api_key" yaml:"api_key"`   // API密钥
-	BaseURL  string `json:"base_url" yaml:"base_url"` // 基础URL
-	Timeout  int    `json:"timeout" yaml:"timeout"`   // 超时时间(秒)
+	Provider   string `json:"provider" yaml:"provider"`       // OCR提供商(tencent)
+	SecretID   string `json:"secret_id" yaml:"secret_id"`     // 腾讯云SecretId
+	SecretKey  string `json:"secret_key" yaml:"secret_key"`   // 腾讯云SecretKey
+	Region     string `json:"region" yaml:"region"`           // 腾讯云地域
+	Timeout    int    `json:"timeout" yaml:"timeout"`         // 超时时间(秒)
+	MaxRetries int    `json:"max_retries" yaml:"max_retries"` // 最大重试次数
 }
 
 // StorageConfig 存储配置

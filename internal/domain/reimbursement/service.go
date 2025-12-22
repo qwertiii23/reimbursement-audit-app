@@ -1,96 +1,201 @@
-// service.go 报销单审核流程编排逻辑
+// service.go 报销单领域服务
 // 功能点：
-// 1. 报销单审核流程编排
-// 2. 调用规则引擎进行刚性规则校验
-// 3. 调用RAG服务进行柔性问题分析
-// 4. 整合审核结果并生成审核报告
-// 5. 处理审核过程中的异常情况
-// 6. 提供审核状态查询接口
+// 1. 实现报销单相关的业务规则
+// 2. 处理发票相关的业务逻辑
+// 3. 提供领域模型验证
+// 4. 封装复杂的业务计算
 
 package reimbursement
 
 import (
 	"context"
-	"reimbursement-audit/internal/api/response"
+	"errors"
+	"time"
+
+	"reimbursement-audit/internal/domain/ocr"
+	"reimbursement-audit/internal/pkg/logger"
+
+	"github.com/google/uuid"
 )
 
-// Service 报销单服务结构体
-type Service struct {
-	// TODO: 添加依赖项（如规则引擎、RAG服务、仓储等）
-	parser *Parser
-	// TODO: 添加其他依赖
+// Service 报销单领域服务接口
+type Service interface {
+	// CreateReimbursement 创建报销单
+	CreateReimbursement(ctx context.Context, req *CreateReimbursementRequest) (*Reimbursement, error)
+
+	// ValidateReimbursement 验证报销单
+	ValidateReimbursement(ctx context.Context, reimbursement *Reimbursement) error
+
+	// ValidateInvoice 验证发票
+	ValidateInvoice(ctx context.Context, invoice *ocr.Invoice) error
 }
 
-// NewService 创建报销单服务实例
-func NewService(parser *Parser) *Service {
-	return &Service{
-		parser: parser,
-		// TODO: 初始化其他依赖
+// CreateReimbursementRequest 创建报销单请求
+type CreateReimbursementRequest struct {
+	UserID      string  `json:"user_id"`
+	UserName    string  `json:"user_name"`
+	Department  string  `json:"department"`
+	Category    string  `json:"category"`
+	Reason      string  `json:"reason"`
+	Description string  `json:"description"`
+	TotalAmount float64 `json:"total_amount"`
+	ApplyDate   string  `json:"apply_date"`
+	ExpenseDate string  `json:"expense_date"`
+}
+
+// DomainService 报销单领域服务实现
+type DomainService struct {
+	repo   Repository
+	logger logger.Logger
+}
+
+// NewDomainService 创建报销单领域服务
+func NewDomainService(repo Repository, logger logger.Logger) Service {
+	return &DomainService{
+		repo:   repo,
+		logger: logger,
 	}
 }
 
-// AuditReimbursement 审核报销单
-func (s *Service) AuditReimbursement(ctx context.Context, reimbursementID string) (*AuditResult, error) {
-	// TODO: 实现报销单审核逻辑
-	return nil, nil
+// CreateReimbursement 创建报销单
+func (s *DomainService) CreateReimbursement(ctx context.Context, req *CreateReimbursementRequest) (*Reimbursement, error) {
+	// 基本参数验证
+	if req.UserID == "" {
+		return nil, errors.New("用户ID不能为空")
+	}
+	if req.TotalAmount <= 0 {
+		return nil, errors.New("报销金额必须大于0")
+	}
+
+	// 解析日期
+	applyDate, expenseDate, err := s.parseDates(ctx, req.ApplyDate, req.ExpenseDate)
+	if err != nil {
+		s.logger.WithContext(ctx).Error("日期解析失败",
+			logger.NewField("error", err.Error()),
+			logger.NewField("apply_date", req.ApplyDate),
+			logger.NewField("expense_date", req.ExpenseDate))
+		return nil, err
+	}
+
+	// 创建报销单领域模型
+	now := time.Now()
+	reimbursement := &Reimbursement{
+		ID:          uuid.New().String(),
+		UserID:      req.UserID,
+		UserName:    req.UserName,
+		Department:  req.Department,
+		Type:        req.Category, // 使用Category作为Type
+		Title:       req.Reason,   // 使用Reason作为Title
+		Description: req.Description,
+		TotalAmount: req.TotalAmount,
+		Currency:    "CNY", // 默认使用人民币
+		ApplyDate:   applyDate,
+		ExpenseDate: expenseDate,
+		Status:      "待提交", // 初始状态为"待提交"
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	// 验证报销单
+	if err := s.ValidateReimbursement(ctx, reimbursement); err != nil {
+		s.logger.WithContext(ctx).Error("报销单验证失败",
+			logger.NewField("error", err.Error()),
+			logger.NewField("reimbursement_id", reimbursement.ID))
+		return nil, err
+	}
+
+	// 保存到数据库
+	if err := s.repo.CreateReimbursement(ctx, reimbursement); err != nil {
+		s.logger.WithContext(ctx).Error("保存报销单失败",
+			logger.NewField("error", err.Error()),
+			logger.NewField("reimbursement_id", reimbursement.ID))
+		return nil, err
+	}
+
+	return reimbursement, nil
 }
 
-// ParseReimbursement 解析报销单
-func (s *Service) ParseReimbursement(ctx context.Context, data []byte) (*Reimbursement, error) {
-	// TODO: 实现报销单解析逻辑
-	return nil, nil
-}
+// ValidateReimbursement 验证报销单
+func (s *DomainService) ValidateReimbursement(ctx context.Context, reimbursement *Reimbursement) error {
+	// 基本字段验证
+	if reimbursement.ID == "" {
+		return errors.New("报销单ID不能为空")
+	}
+	if reimbursement.UserID == "" {
+		return errors.New("用户ID不能为空")
+	}
+	if reimbursement.TotalAmount <= 0 {
+		return errors.New("报销金额必须大于0")
+	}
 
-// ParseInvoices 解析发票
-func (s *Service) ParseInvoices(ctx context.Context, files []string) ([]*Invoice, error) {
-	// TODO: 实现发票解析逻辑
-	return nil, nil
-}
+	// 业务规则验证
+	if reimbursement.ApplyDate.After(time.Now()) {
+		return errors.New("申请日期不能是未来日期")
+	}
 
-// ValidateReimbursement 校验报销单
-func (s *Service) ValidateReimbursement(ctx context.Context, reimbursement *Reimbursement) (*ValidationResult, error) {
-	// TODO: 实现报销单校验逻辑
-	return nil, nil
-}
+	if reimbursement.ExpenseDate.After(time.Now()) {
+		return errors.New("费用发生日期不能是未来日期")
+	}
 
-// GenerateAuditReport 生成审核报告
-func (s *Service) GenerateAuditReport(ctx context.Context, reimbursementID string) (*response.AuditReport, error) {
-	// TODO: 实现生成审核报告逻辑
-	return nil, nil
-}
+	if reimbursement.ExpenseDate.After(reimbursement.ApplyDate) {
+		return errors.New("费用发生日期不能晚于申请日期")
+	}
 
-// GetAuditStatus 获取审核状态
-func (s *Service) GetAuditStatus(ctx context.Context, reimbursementID string) (*AuditStatus, error) {
-	// TODO: 实现获取审核状态逻辑
-	return nil, nil
-}
+	// 可以添加更多业务规则验证...
 
-// GetAuditResult 获取审核结果
-func (s *Service) GetAuditResult(ctx context.Context, reimbursementID string) (*AuditResult, error) {
-	// TODO: 实现获取审核结果逻辑
-	return nil, nil
-}
-
-// GetReimbursementByUserID 根据用户ID获取报销单列表
-func (s *Service) GetReimbursementByUserID(ctx context.Context, userID string, page, size int) ([]*Reimbursement, int64, error) {
-	// TODO: 实现根据用户ID获取报销单列表逻辑
-	return nil, 0, nil
-}
-
-// GetReimbursementByDateRange 根据日期范围获取报销单列表
-func (s *Service) GetReimbursementByDateRange(ctx context.Context, startDate, endDate string, page, size int) ([]*Reimbursement, int64, error) {
-	// TODO: 实现根据日期范围获取报销单列表逻辑
-	return nil, 0, nil
-}
-
-// SaveReimbursement 保存报销单
-func (s *Service) SaveReimbursement(ctx context.Context, reimbursement *Reimbursement) error {
-	// TODO: 实现保存报销单逻辑
 	return nil
 }
 
-// SaveAuditResult 保存审核结果
-func (s *Service) SaveAuditResult(ctx context.Context, result *AuditResult) error {
-	// TODO: 实现保存审核结果逻辑
+// ValidateInvoice 验证发票
+func (s *DomainService) ValidateInvoice(ctx context.Context, invoice *ocr.Invoice) error {
+	// 基本字段验证
+	if invoice.ID == "" {
+		return errors.New("发票ID不能为空")
+	}
+	if invoice.ReimbursementID == "" {
+		return errors.New("报销单ID不能为空")
+	}
+	if invoice.ImagePath == "" {
+		return errors.New("发票图片路径不能为空")
+	}
+
+	// 可以添加更多业务规则验证...
+
 	return nil
+}
+
+// parseDates 解析申请日期和费用发生日期
+func (s *DomainService) parseDates(ctx context.Context, applyDateStr, expenseDateStr string) (time.Time, time.Time, error) {
+	var applyDate, expenseDate time.Time
+	var err error
+
+	// 如果提供了申请日期，解析它
+	if applyDateStr != "" {
+		applyDate, err = time.Parse("2006-01-02", applyDateStr)
+		if err != nil {
+			s.logger.WithContext(ctx).Error("申请日期格式不正确",
+				logger.NewField("error", err.Error()),
+				logger.NewField("apply_date", applyDateStr))
+			return time.Time{}, time.Time{}, errors.New("申请日期格式不正确，应为YYYY-MM-DD")
+		}
+	} else {
+		// 如果没有提供申请日期，使用当前日期
+		applyDate = time.Now()
+	}
+
+	// 如果提供了费用发生日期，解析它
+	if expenseDateStr != "" {
+		expenseDate, err = time.Parse("2006-01-02", expenseDateStr)
+		if err != nil {
+			s.logger.WithContext(ctx).Error("费用发生日期格式不正确",
+				logger.NewField("error", err.Error()),
+				logger.NewField("expense_date", expenseDateStr))
+			return time.Time{}, time.Time{}, errors.New("费用发生日期格式不正确，应为YYYY-MM-DD")
+		}
+	} else {
+		// 如果没有提供费用发生日期，使用申请日期
+		expenseDate = applyDate
+	}
+
+	return applyDate, expenseDate, nil
 }
