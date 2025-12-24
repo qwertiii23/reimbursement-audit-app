@@ -10,6 +10,7 @@ import (
 	"reimbursement-audit/internal/config"
 	"reimbursement-audit/internal/infra/storage/mysql"
 	mysqlmigration "reimbursement-audit/internal/infra/storage/mysql/migration"
+	"reimbursement-audit/internal/pkg/logger"
 )
 
 var (
@@ -52,7 +53,13 @@ func main() {
 		// TODO: 从配置中设置数据库参数
 	}
 
-	client := mysql.NewClient()
+	// 创建日志记录器
+	loggerInstance, err := logger.NewLogger(logger.DefaultConfig())
+	if err != nil {
+		log.Fatalf("创建日志记录器失败: %v", err)
+	}
+
+	client := mysql.NewClient(loggerInstance)
 	if err := client.Connect(context.Background(), dbConfig); err != nil {
 		log.Fatalf("连接数据库失败: %v", err)
 	}

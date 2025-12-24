@@ -11,24 +11,29 @@ package mysql
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
+
+	"reimbursement-audit/internal/pkg/logger"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 // Client MySQL客户端结构体
 type Client struct {
 	db     *gorm.DB
 	config *Config
+	logger logger.Logger
 	mu     sync.RWMutex
 }
 
 // NewClient 创建MySQL客户端实例
-func NewClient() *Client {
-	return &Client{}
+func NewClient(logger logger.Logger) *Client {
+	return &Client{
+		logger: logger,
+	}
 }
 
 // Connect 连接数据库
@@ -40,32 +45,36 @@ func (c *Client) Connect(ctx context.Context, config *Config) error {
 	dsn := config.GetDSN()
 
 	// 配置GORM日志级别
-	var logLevel logger.LogLevel
+	var logLevel gormLogger.LogLevel
 	switch config.LogLevel {
 	case "silent":
-		logLevel = logger.Silent
+		logLevel = gormLogger.Silent
 	case "error":
-		logLevel = logger.Error
+		logLevel = gormLogger.Error
 	case "warn":
-		logLevel = logger.Warn
+		logLevel = gormLogger.Warn
 	case "info":
-		logLevel = logger.Info
+		logLevel = gormLogger.Info
 	default:
-		logLevel = logger.Warn
+		logLevel = gormLogger.Warn
 	}
 
 	// 打开数据库连接
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logLevel),
+		Logger: gormLogger.Default.LogMode(logLevel),
 	})
 	if err != nil {
-		return fmt.Errorf("打开数据库连接失败: %w", err)
+		c.logger.WithContext(ctx).Error("打开数据库连接失败",
+			logger.NewField("error", err.Error()))
+		return errors.New("打开数据库连接失败")
 	}
 
 	// 获取底层sql.DB对象以配置连接池
 	sqlDB, err := db.DB()
 	if err != nil {
-		return fmt.Errorf("获取底层SQL数据库连接失败: %w", err)
+		c.logger.WithContext(ctx).Error("获取底层SQL数据库连接失败",
+			logger.NewField("error", err.Error()))
+		return errors.New("获取底层SQL数据库连接失败")
 	}
 
 	// 设置连接池参数
@@ -76,7 +85,9 @@ func (c *Client) Connect(ctx context.Context, config *Config) error {
 
 	// 测试连接
 	if err := sqlDB.PingContext(ctx); err != nil {
-		return fmt.Errorf("数据库连接测试失败: %w", err)
+		c.logger.WithContext(ctx).Error("数据库连接测试失败",
+			logger.NewField("error", err.Error()))
+		return errors.New("数据库连接测试失败")
 	}
 
 	c.db = db
@@ -94,7 +105,9 @@ func (c *Client) Disconnect(ctx context.Context) error {
 func (c *Client) Ping(ctx context.Context) error {
 	sqlDB, err := c.GetDB().DB()
 	if err != nil {
-		return fmt.Errorf("获取底层SQL数据库连接失败: %w", err)
+		c.logger.WithContext(ctx).Error("获取底层SQL数据库连接失败",
+			logger.NewField("error", err.Error()))
+		return errors.New("获取底层SQL数据库连接失败")
 	}
 	return sqlDB.PingContext(ctx)
 }
@@ -130,8 +143,10 @@ func (c *Client) Migrate(ctx context.Context, models ...interface{}) error {
 func (c *Client) GetConnectionStats() map[string]interface{} {
 	sqlDB, err := c.GetDB().DB()
 	if err != nil {
+		c.logger.Error("获取底层SQL数据库连接失败",
+			logger.NewField("error", err.Error()))
 		return map[string]interface{}{
-			"error": fmt.Sprintf("获取底层SQL数据库连接失败: %v", err),
+			"error": "获取底层SQL数据库连接失败",
 		}
 	}
 
@@ -157,7 +172,9 @@ func (c *Client) Close() error {
 	if c.db != nil {
 		sqlDB, err := c.db.DB()
 		if err != nil {
-			return fmt.Errorf("获取底层SQL数据库连接失败: %w", err)
+			c.logger.Error("获取底层SQL数据库连接失败",
+				logger.NewField("error", err.Error()))
+			return errors.New("获取底层SQL数据库连接失败")
 		}
 		return sqlDB.Close()
 	}
@@ -177,12 +194,15 @@ func (c *Client) IsConnected() bool {
 func (c *Client) Reconnect(ctx context.Context) error {
 	if c.IsConnected() {
 		if err := c.Disconnect(ctx); err != nil {
-			return fmt.Errorf("断开连接失败: %w", err)
+			c.logger.WithContext(ctx).Error("断开连接失败",
+				logger.NewField("error", err.Error()))
+			return errors.New("断开连接失败")
 		}
 	}
 
 	if c.config == nil {
-		return fmt.Errorf("配置信息不存在，无法重新连接")
+		c.logger.WithContext(ctx).Error("配置信息不存在，无法重新连接")
+		return errors.New("配置信息不存在，无法重新连接")
 	}
 
 	return c.Connect(ctx, c.config)

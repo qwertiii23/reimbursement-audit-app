@@ -11,66 +11,33 @@ package request
 
 // CreateRuleRequest 创建规则请求
 type CreateRuleRequest struct {
-	// TODO: 定义创建规则相关字段（如规则名称、类型、条件、动作等）
+	Name        string   `json:"name"`        // 规则名称
+	Description string   `json:"description"` // 规则描述
+	Type        string   `json:"type"`        // 规则类型(金额/频次/发票/合规等)
+	Category    string   `json:"category"`    // 规则分类
+	Definition  string   `json:"definition"`  // 规则定义(Grule语法)
+	Priority    int      `json:"priority"`    // 优先级(数字越大优先级越高)
+	Enabled     bool     `json:"enabled"`     // 是否启用
+	CreatedBy   string   `json:"created_by"`  // 创建人
+	UpdatedBy   string   `json:"updated_by"`  // 更新人
+	Version     int      `json:"version"`     // 版本号
+	Tags        []string `json:"tags"`        // 标签
 }
 
 // UpdateRuleRequest 更新规则请求
 type UpdateRuleRequest struct {
-	// TODO: 定义更新规则相关字段
-}
-
-// RuleQueryRequest 规则查询请求
-type RuleQueryRequest struct {
-	// TODO: 定义规则查询相关字段
-}
-
-// RuleTestRequest 规则测试请求
-type RuleTestRequest struct {
-	// TODO: 定义规则测试相关字段
-}
-
-// RulePriorityUpdateRequest 规则优先级更新请求
-type RulePriorityUpdateRequest struct {
-	// TODO: 定义规则优先级更新相关字段
-}
-
-// RuleStatusUpdateRequest 规则状态更新请求
-type RuleStatusUpdateRequest struct {
-	// TODO: 定义规则状态更新相关字段
-}
-
-// Validate 校验创建规则请求
-func (r *CreateRuleRequest) Validate() error {
-	// TODO: 实现创建规则请求校验逻辑
-	return nil
-}
-
-// Validate 校验更新规则请求
-func (r *UpdateRuleRequest) Validate() error {
-	// TODO: 实现更新规则请求校验逻辑
-	return nil
-}
-
-// Validate 校验规则查询请求
-func (r *RuleQueryRequest) Validate() error {
-	// TODO: 实现规则查询请求校验逻辑
-	return nil
-}
-
-// Validate 校验规则测试请求
-func (r *RuleTestRequest) Validate() error {
-	// TODO: 实现规则测试请求校验逻辑
-	return nil
-}
-
-// Validate 校验规则优先级更新请求
-func (r *RulePriorityUpdateRequest) Validate() error {
-	// TODO: 实现规则优先级更新请求校验逻辑
-	return nil
-}
-
-// Validate 校验规则状态更新请求
-func (r *RuleStatusUpdateRequest) Validate() error {
-	// TODO: 实现规则状态更新请求校验逻辑
-	return nil
+	ID          string   `json:"id"`          // 规则ID
+	RuleCode    string   `json:"rule_code"`   // 规则编码(唯一)
+	Name        string   `json:"name"`        // 规则名称
+	Description string   `json:"description"` // 规则描述
+	Type        string   `json:"type"`        // 规则类型(金额/频次/发票/合规等)
+	Category    string   `json:"category"`    // 规则分类
+	Status      string   `json:"status"`      // 规则状态(启用/禁用/草稿)
+	Definition  string   `json:"definition"`  // 规则定义(Grule语法)
+	Priority    int      `json:"priority"`    // 优先级(数字越大优先级越高)
+	Enabled     bool     `json:"enabled"`     // 是否启用
+	CreatedBy   string   `json:"created_by"`  // 创建人
+	UpdatedBy   string   `json:"updated_by"`  // 更新人
+	Version     int      `json:"version"`     // 版本号
+	Tags        []string `json:"tags"`        // 标签
 }

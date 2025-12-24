@@ -69,6 +69,43 @@ type Invoice struct {
 	Status          string    `json:"status" gorm:"type:varchar(20);not null;default:'待识别';column:status"`                                  // 状态(待识别/已识别/识别失败)
 	CreatedAt       time.Time `json:"created_at" gorm:"type:datetime;not null;column:created_at"`                                           // 创建时间
 	UpdatedAt       time.Time `json:"updated_at" gorm:"type:datetime;not null;column:updated_at"`                                           // 更新时间
+
+	// 扩展字段 - 支持更丰富的报销规则
+	Category           string    `json:"category" gorm:"type:varchar(50);column:category"`                                     // 发票类别(差旅费/办公费/招待费/培训费等)
+	SubCategory        string    `json:"sub_category" gorm:"type:varchar(50);column:sub_category"`                             // 发票子类别(住宿费/交通费/餐饮费等)
+	ExpenseType        string    `json:"expense_type" gorm:"type:varchar(50);column:expense_type"`                             // 费用类型(日常/紧急/计划内等)
+	PaymentMethod      string    `json:"payment_method" gorm:"type:varchar(50);column:payment_method"`                         // 支付方式(现金/信用卡/公司账户等)
+	MerchantType       string    `json:"merchant_type" gorm:"type:varchar(50);column:merchant_type"`                           // 商户类型(酒店/餐厅/航空公司等)
+	MerchantCode       string    `json:"merchant_code" gorm:"type:varchar(50);column:merchant_code"`                           // 商户编码
+	Location           string    `json:"location" gorm:"type:varchar(100);column:location"`                                    // 消费地点
+	City               string    `json:"city" gorm:"type:varchar(50);column:city"`                                             // 消费城市
+	Province           string    `json:"province" gorm:"type:varchar(50);column:province"`                                     // 消费省份
+	Country            string    `json:"country" gorm:"type:varchar(50);default:'中国';column:country"`                          // 消费国家
+	Purpose            string    `json:"purpose" gorm:"type:varchar(200);column:purpose"`                                      // 消费目的
+	Description        string    `json:"description" gorm:"type:text;column:description"`                                      // 发票描述
+	ProjectCode        string    `json:"project_code" gorm:"type:varchar(50);column:project_code"`                             // 项目编码
+	DepartmentCode     string    `json:"department_code" gorm:"type:varchar(50);column:department_code"`                       // 部门编码
+	CostCenter         string    `json:"cost_center" gorm:"type:varchar(50);column:cost_center"`                               // 成本中心
+	ContractNumber     string    `json:"contract_number" gorm:"type:varchar(50);column:contract_number"`                       // 合同编号
+	ApprovalLevel      string    `json:"approval_level" gorm:"type:varchar(20);column:approval_level"`                         // 审批级别(普通/重要/重大)
+	IsReimbursable     bool      `json:"is_reimbursable" gorm:"type:boolean;default:true;column:is_reimbursable"`              // 是否可报销
+	IsPersonal         bool      `json:"is_personal" gorm:"type:boolean;default:false;column:is_personal"`                     // 是否个人消费
+	IsVAT              bool      `json:"is_vat" gorm:"type:boolean;default:false;column:is_vat"`                               // 是否增值税发票
+	VATRate            float64   `json:"vat_rate" gorm:"type:decimal(5,2);column:vat_rate"`                                    // 增值税率
+	ExchangeRate       float64   `json:"exchange_rate" gorm:"type:decimal(10,4);default:1.0;column:exchange_rate"`             // 汇率
+	OriginalAmount     float64   `json:"original_amount" gorm:"type:decimal(10,2);column:original_amount"`                     // 原币金额
+	OriginalCurrency   string    `json:"original_currency" gorm:"type:varchar(10);column:original_currency"`                   // 原币种
+	ReceiptNumber      string    `json:"receipt_number" gorm:"type:varchar(50);column:receipt_number"`                         // 收据编号
+	InvoiceSeries      string    `json:"invoice_series" gorm:"type:varchar(50);column:invoice_series"`                         // 发票系列
+	BatchNumber        string    `json:"batch_number" gorm:"type:varchar(50);column:batch_number"`                             // 批次号
+	ValidFrom          time.Time `json:"valid_from" gorm:"type:date;column:valid_from"`                                        // 有效期开始
+	ValidTo            time.Time `json:"valid_to" gorm:"type:date;column:valid_to"`                                            // 有效期结束
+	IsElectronic       bool      `json:"is_electronic" gorm:"type:boolean;default:false;column:is_electronic"`                 // 是否电子发票
+	IsDuplicate        bool      `json:"is_duplicate" gorm:"type:boolean;default:false;column:is_duplicate"`                   // 是否重复发票
+	RelatedInvoiceID   string    `json:"related_invoice_id" gorm:"type:varchar(36);column:related_invoice_id"`                 // 关联发票ID(红字发票关联)
+	VerificationStatus string    `json:"verification_status" gorm:"type:varchar(20);default:'未验证';column:verification_status"` // 验证状态
+	VerificationTime   time.Time `json:"verification_time" gorm:"type:datetime;column:verification_time"`                      // 验证时间
+	Remarks            string    `json:"remarks" gorm:"type:text;column:remarks"`                                              // 备注
 }
 
 // Config OCR服务配置
@@ -82,7 +119,6 @@ type Config struct {
 	Timeout    int `json:"timeout" yaml:"timeout"`         // 超时时间(秒)
 	MaxRetries int `json:"max_retries" yaml:"max_retries"` // 最大重试次数
 }
-
 
 // Validate 验证发票信息是否有效
 func (i *InvoiceInfo) Validate() (bool, string) {
