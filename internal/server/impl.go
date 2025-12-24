@@ -93,13 +93,16 @@ func (s *serverImpl) RegisterRoutes() {
 	// 注册日志中间件，用于将带有traceId的logger注入到Gin上下文中
 	s.engine.Use(middleware.LoggerMiddleware(loggerImpl))
 
+	// 创建logger实例
+	loggerInstance, _ := logger.NewLogger(logger.DefaultConfig())
+
 	// 注册健康检查路由
 	s.engine.GET("/health", HealthCheck)
 	s.engine.GET("/ready", ReadyCheck)
 	s.engine.GET("/version", VersionCheck("1.0.0"))
 
 	// 创建MySQL客户端（实际应该从依赖注入获取）
-	mysqlClient := mysqlRepo.NewClient()
+	mysqlClient := mysqlRepo.NewClient(loggerInstance)
 	// TODO: 这里应该从配置中获取数据库连接信息
 	// mysqlClient.Connect(ctx, config)
 
@@ -107,9 +110,6 @@ func (s *serverImpl) RegisterRoutes() {
 	// TODO: 从配置中获取存储路径和URL
 	localStorage := storage.NewLocalStorage("./uploads", "http://localhost:8080/uploads")
 	fileService := storage.NewService(localStorage)
-
-	// 创建logger实例
-	loggerInstance, _ := logger.NewLogger(logger.DefaultConfig())
 
 	// 创建OCR服务
 	// 从配置中获取OCR配置

@@ -49,8 +49,8 @@ func (m *MigrationManager) Up(ctx context.Context) error {
 		// 报销单相关模型
 		&reimbursement.Reimbursement{},
 		&ocr.Invoice{},
-		&reimbursement.AuditResult{},
-		&reimbursement.AuditStatus{},
+		// &reimbursement.AuditResult{},
+		// &reimbursement.AuditStatus{},
 	)
 
 	if err != nil {
