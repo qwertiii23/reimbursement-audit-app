@@ -21,16 +21,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// Service 规则服务结构体
-type Service struct {
+// RuleService 规则服务结构体
+type RuleService struct {
 	repo   Repository
 	logger logger.Logger
 	engine *GRuleEngine
 }
 
-// NewService 创建规则服务实例
-func NewService(repo Repository, logger logger.Logger, engine *GRuleEngine) *Service {
-	return &Service{
+// NewRuleService 创建规则服务实例
+func NewRuleService(repo Repository, logger logger.Logger, engine *GRuleEngine) *RuleService {
+	return &RuleService{
 		repo:   repo,
 		logger: logger,
 		engine: engine,
@@ -39,7 +39,7 @@ func NewService(repo Repository, logger logger.Logger, engine *GRuleEngine) *Ser
 
 // generateRuleCode 生成规则编码
 // 格式: RULE_YYYYMMDD_HHMMSS_UUID
-func (s *Service) generateRuleCode() string {
+func (s *RuleService) generateRuleCode() string {
 	now := time.Now()
 	timeStr := now.Format("20060102_150405")
 	uuidStr := uuid.New().String()[:8] // 取UUID前8位
@@ -47,7 +47,7 @@ func (s *Service) generateRuleCode() string {
 }
 
 // CreateRule 创建规则
-func (s *Service) CreateRule(ctx context.Context, req *request.CreateRuleRequest) (*Rule, error) {
+func (s *RuleService) CreateRule(ctx context.Context, req *request.CreateRuleRequest) (*Rule, error) {
 	// 参数验证
 	if req.Name == "" {
 		s.logger.WithContext(ctx).Error("规则名称不能为空")
@@ -117,7 +117,7 @@ func (s *Service) CreateRule(ctx context.Context, req *request.CreateRuleRequest
 }
 
 // UpdateRule 更新规则
-func (s *Service) UpdateRule(ctx context.Context, req *request.UpdateRuleRequest) (*Rule, error) {
+func (s *RuleService) UpdateRule(ctx context.Context, req *request.UpdateRuleRequest) (*Rule, error) {
 	// 参数验证
 	if req.ID == "" {
 		s.logger.WithContext(ctx).Error("规则ID不能为空")
@@ -203,7 +203,7 @@ func (s *Service) UpdateRule(ctx context.Context, req *request.UpdateRuleRequest
 }
 
 // GetRules 获取规则列表
-func (s *Service) GetRules(ctx context.Context, filter *RuleFilter) ([]*Rule, int64, error) {
+func (s *RuleService) GetRules(ctx context.Context, filter *RuleFilter) ([]*Rule, int64, error) {
 	// 设置默认分页参数
 	if filter != nil {
 		if filter.Page <= 0 {
@@ -235,7 +235,7 @@ func (s *Service) GetRules(ctx context.Context, filter *RuleFilter) ([]*Rule, in
 }
 
 // GetRuleByID 根据ID获取规则
-func (s *Service) GetRuleByID(ctx context.Context, id string) (*Rule, error) {
+func (s *RuleService) GetRuleByID(ctx context.Context, id string) (*Rule, error) {
 	if id == "" {
 		s.logger.WithContext(ctx).Error("规则ID不能为空")
 		return nil, errors.New("规则ID不能为空")
@@ -253,7 +253,7 @@ func (s *Service) GetRuleByID(ctx context.Context, id string) (*Rule, error) {
 }
 
 // GetRuleByCode 根据规则编码获取规则
-func (s *Service) GetRuleByCode(ctx context.Context, ruleCode string) (*Rule, error) {
+func (s *RuleService) GetRuleByCode(ctx context.Context, ruleCode string) (*Rule, error) {
 	if ruleCode == "" {
 		s.logger.WithContext(ctx).Error("规则编码不能为空")
 		return nil, errors.New("规则编码不能为空")
@@ -271,7 +271,7 @@ func (s *Service) GetRuleByCode(ctx context.Context, ruleCode string) (*Rule, er
 }
 
 // DeleteRule 删除规则
-func (s *Service) DeleteRule(ctx context.Context, id string) error {
+func (s *RuleService) DeleteRule(ctx context.Context, id string) error {
 	if id == "" {
 		s.logger.WithContext(ctx).Error("规则ID不能为空")
 		return errors.New("规则ID不能为空")
@@ -301,7 +301,7 @@ func (s *Service) DeleteRule(ctx context.Context, id string) error {
 }
 
 // EnableRule 启用规则
-func (s *Service) EnableRule(ctx context.Context, id string) error {
+func (s *RuleService) EnableRule(ctx context.Context, id string) error {
 	if id == "" {
 		s.logger.WithContext(ctx).Error("规则ID不能为空")
 		return errors.New("规则ID不能为空")
@@ -338,7 +338,7 @@ func (s *Service) EnableRule(ctx context.Context, id string) error {
 }
 
 // DisableRule 禁用规则
-func (s *Service) DisableRule(ctx context.Context, id string) error {
+func (s *RuleService) DisableRule(ctx context.Context, id string) error {
 	if id == "" {
 		s.logger.WithContext(ctx).Error("规则ID不能为空")
 		return errors.New("规则ID不能为空")
@@ -375,55 +375,55 @@ func (s *Service) DisableRule(ctx context.Context, id string) error {
 }
 
 // ValidateRules 执行规则校验
-func (s *Service) ValidateRules(ctx context.Context, data interface{}, ruleIDs []string) ([]*RuleValidationResult, error) {
+func (s *RuleService) ValidateRules(ctx context.Context, data interface{}, ruleIDs []string) ([]*RuleValidationResult, error) {
 	// TODO: 实现规则校验逻辑
 	return nil, nil
 }
 
 // ValidateAllRules 执行所有规则校验
-func (s *Service) ValidateAllRules(ctx context.Context, data interface{}) ([]*RuleValidationResult, error) {
+func (s *RuleService) ValidateAllRules(ctx context.Context, data interface{}) ([]*RuleValidationResult, error) {
 	// TODO: 实现所有规则校验逻辑
 	return nil, nil
 }
 
 // ValidateRuleByType 按类型执行规则校验
-func (s *Service) ValidateRuleByType(ctx context.Context, data interface{}, ruleType string) ([]*RuleValidationResult, error) {
+func (s *RuleService) ValidateRuleByType(ctx context.Context, data interface{}, ruleType string) ([]*RuleValidationResult, error) {
 	// TODO: 实现按类型规则校验逻辑
 	return nil, nil
 }
 
 // TestRule 测试规则
-func (s *Service) TestRule(ctx context.Context, rule *Rule, testData interface{}) (*RuleValidationResult, error) {
+func (s *RuleService) TestRule(ctx context.Context, rule *Rule, testData interface{}) (*RuleValidationResult, error) {
 	// TODO: 实现测试规则逻辑
 	return nil, nil
 }
 
 // LoadRules 加载规则
-func (s *Service) LoadRules(ctx context.Context) error {
+func (s *RuleService) LoadRules(ctx context.Context) error {
 	// TODO: 实现加载规则逻辑
 	return nil
 }
 
 // ReloadRules 重新加载规则
-func (s *Service) ReloadRules(ctx context.Context) error {
+func (s *RuleService) ReloadRules(ctx context.Context) error {
 	// TODO: 实现重新加载规则逻辑
 	return nil
 }
 
 // GetRuleTypes 获取规则类型列表
-func (s *Service) GetRuleTypes(ctx context.Context) ([]string, error) {
+func (s *RuleService) GetRuleTypes(ctx context.Context) ([]string, error) {
 	// TODO: 实现获取规则类型列表逻辑
 	return []string{RuleTypeAmount, RuleTypeFrequency, RuleTypeInvoice, RuleTypeCompliance, RuleTypeCustom}, nil
 }
 
 // ResolveRuleConflicts 解决规则冲突
-func (s *Service) ResolveRuleConflicts(results []*RuleValidationResult) []*RuleValidationResult {
+func (s *RuleService) ResolveRuleConflicts(results []*RuleValidationResult) []*RuleValidationResult {
 	// TODO: 实现解决规则冲突逻辑
 	return nil
 }
 
 // SortRulesByPriority 按优先级排序规则
-func (s *Service) SortRulesByPriority(rules []*Rule) []*Rule {
+func (s *RuleService) SortRulesByPriority(rules []*Rule) []*Rule {
 	// TODO: 实现按优先级排序规则逻辑
 	return nil
 }

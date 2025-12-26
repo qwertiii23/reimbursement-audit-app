@@ -11,55 +11,75 @@ package request
 
 // StartAuditRequest 开始审核请求
 type StartAuditRequest struct {
-	// TODO: 定义开始审核相关字段（如报销单ID等）
+	ReimbursementID string `json:"reimbursement_id" binding:"required"`
 }
 
 // AuditStatusRequest 审核状态查询请求
 type AuditStatusRequest struct {
-	// TODO: 定义审核状态查询相关字段
+	AuditID string `json:"audit_id" binding:"required"`
 }
 
 // AuditResultRequest 审核结果查询请求
 type AuditResultRequest struct {
-	// TODO: 定义审核结果查询相关字段
+	AuditID string `json:"audit_id" binding:"required"`
 }
 
 // AuditHistoryRequest 审核历史查询请求
 type AuditHistoryRequest struct {
-	// TODO: 定义审核历史查询相关字段
+	ReimbursementID string `json:"reimbursement_id"`
+	Status          string `json:"status"`
+	Page            int    `json:"page" binding:"min=1"`
+	Size            int    `json:"size" binding:"min=1,max=100"`
 }
 
 // PaginationRequest 分页请求
 type PaginationRequest struct {
-	// TODO: 定义分页相关字段（页码、每页数量等）
+	Page int `json:"page" binding:"min=1"`
+	Size int `json:"size" binding:"min=1,max=100"`
 }
 
 // Validate 校验开始审核请求
 func (r *StartAuditRequest) Validate() error {
-	// TODO: 实现开始审核请求校验逻辑
+	if r.ReimbursementID == "" {
+		return nil
+	}
 	return nil
 }
 
 // Validate 校验审核状态查询请求
 func (r *AuditStatusRequest) Validate() error {
-	// TODO: 实现审核状态查询请求校验逻辑
+	if r.AuditID == "" {
+		return nil
+	}
 	return nil
 }
 
 // Validate 校验审核结果查询请求
 func (r *AuditResultRequest) Validate() error {
-	// TODO: 实现审核结果查询请求校验逻辑
+	if r.AuditID == "" {
+		return nil
+	}
 	return nil
 }
 
 // Validate 校验审核历史查询请求
 func (r *AuditHistoryRequest) Validate() error {
-	// TODO: 实现审核历史查询请求校验逻辑
+	if r.Page <= 0 {
+		r.Page = 1
+	}
+	if r.Size <= 0 || r.Size > 100 {
+		r.Size = 10
+	}
 	return nil
 }
 
 // Validate 校验分页请求
 func (r *PaginationRequest) Validate() error {
-	// TODO: 实现分页请求校验逻辑
+	if r.Page <= 0 {
+		r.Page = 1
+	}
+	if r.Size <= 0 || r.Size > 100 {
+		r.Size = 10
+	}
 	return nil
 }

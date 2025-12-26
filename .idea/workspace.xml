@@ -5,17 +5,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c99502e4-42b0-41ee-8127-da27adbb99a3" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/cmd/migrate/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/migrate/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/configs/config.dev.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/configs/config.dev.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/request/rule_request.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/request/rule_request.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/domain/reimbursement/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/reimbursement/model.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/domain/rule/grule_engine.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/grule_engine.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/domain/rule/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/model.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/api/handler/audit_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/audit_handler.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/api/handler/rule_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/rule_handler.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/api/handler/upload_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/upload_handler.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/api/request/audit_request.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/request/audit_request.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/api/response/report.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/response/report.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rag/document_processor.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rag/document_processor.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rag/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rag/model.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rag/prompt_builder.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rag/prompt_builder.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rag/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rag/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rag/vector_store.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rag/vector_store.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/domain/rule/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/infra/storage/mysql/client.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/infra/storage/mysql/client.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/infra/storage/mysql/migration/migration.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/infra/storage/mysql/migration/migration.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/server/impl.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/server/impl.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -26,9 +30,9 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 8
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 8
+}</component>
   <component name="ProjectId" id="376ql7wZaZuZiEdg2KUzvinXtKD" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -37,6 +41,7 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.go.formatter.settings.were.checked": "true",
     "RunOnceActivity.go.migrated.go.modules.settings": "true",
     "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
@@ -46,7 +51,8 @@
     "node.js.detected.package.eslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "onboarding.tips.debug.path": "/Users/lijiaqi/reimbursement-audit/main.go"
+    "onboarding.tips.debug.path": "/Users/lijiaqi/reimbursement-audit/main.go",
+    "settings.editor.selected.configurable": "preferences.lookFeel"
   }
 }]]></component>
   <component name="SharedIndexes">
@@ -61,6 +67,17 @@
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
   </component>
@@ -69,7 +86,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/main.go</url>
-          <line>18</line>
+          <line>20</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
       </breakpoints>
