@@ -1,22 +1,16 @@
 // report.go 审核报告结构体
 // 功能点：
 // 1. 定义审核报告数据结构
-// 2. 定义规则校验结果结构
-// 3. 定义RAG分析结果结构
-// 4. 定义审核结论结构
-// 5. 定义审核问题列表结构
-// 6. 提供报告数据转换方法
+// 2. 定义RAG分析结果结构
+// 3. 定义审核结论结构
+// 4. 定义审核问题列表结构
+// 5. 提供报告数据转换方法
 
 package response
 
 // AuditReport 审核报告结构体
 type AuditReport struct {
 	// TODO: 定义审核报告基础字段（如ID、报销单ID、审核时间等）
-}
-
-// RuleValidationResult 规则校验结果结构体
-type RuleValidationResult struct {
-	// TODO: 定义规则校验结果字段（如规则ID、规则名称、是否通过、失败原因等）
 }
 
 // RAGAnalysisResult RAG分析结果结构体

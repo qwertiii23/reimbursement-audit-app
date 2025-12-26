@@ -11,7 +11,6 @@ package handler
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 
@@ -20,36 +19,6 @@ import (
 	"reimbursement-audit/internal/api/response"
 	"reimbursement-audit/internal/application/service"
 )
-
-// JSONResponse 返回JSON响应的辅助函数
-func JSONResponse(c *gin.Context, code int, message string, data interface{}) {
-	// 获取traceId
-	traceId := middleware.GetTraceId(c)
-
-	// 构建响应数据
-	responseData := gin.H{
-		"code":    code,
-		"message": message,
-		"data":    data,
-	}
-
-	// 如果有traceId，添加到响应中
-	if traceId != "" {
-		responseData["trace_id"] = traceId
-	}
-
-	c.JSON(http.StatusOK, responseData)
-}
-
-// 返回错误响应的辅助函数
-func ErrorResponse(c *gin.Context, code int, message string) {
-	JSONResponse(c, code, message, nil)
-}
-
-// 返回成功响应的辅助函数
-func SuccessResponse(c *gin.Context, data interface{}) {
-	JSONResponse(c, response.CodeSuccess, "成功", data)
-}
 
 // UploadHandler 处理文件上传的结构体
 type UploadHandler struct {
@@ -97,7 +66,7 @@ func (h *UploadHandler) UploadReimbursement(c *gin.Context) {
 				"error", err.Error(),
 				"context", ctx)
 			// 返回参数错误响应
-			ErrorResponse(c, response.CodeInvalidParams, "请求参数格式错误: "+err.Error())
+			response.ErrorResponse(c, response.CodeInvalidParams, "请求参数格式错误: "+err.Error())
 			return
 		}
 	} else {
@@ -109,7 +78,7 @@ func (h *UploadHandler) UploadReimbursement(c *gin.Context) {
 				"error", err.Error(),
 				"context", ctx)
 			// 返回参数错误响应
-			ErrorResponse(c, response.CodeInvalidParams, "请求参数格式错误: "+err.Error())
+			response.ErrorResponse(c, response.CodeInvalidParams, "请求参数格式错误: "+err.Error())
 			return
 		}
 	}
@@ -121,7 +90,7 @@ func (h *UploadHandler) UploadReimbursement(c *gin.Context) {
 			"error", err.Error(),
 			"user_id", req.UserID,
 			"context", ctx)
-		ErrorResponse(c, response.CodeInternalError, err.Error())
+		response.ErrorResponse(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -129,7 +98,7 @@ func (h *UploadHandler) UploadReimbursement(c *gin.Context) {
 	middleware.LogInfo(c, "报销单上传处理完成",
 		"reimbursement_id", result.ReimbursementID,
 		"user_id", req.UserID)
-	SuccessResponse(c, result)
+	response.SuccessResponse(c, result)
 }
 
 // UploadInvoices 处理发票图片上传
@@ -152,14 +121,14 @@ func (h *UploadHandler) UploadInvoices(c *gin.Context) {
 		middleware.LogError(c, "获取上传文件失败",
 			"error", err.Error(),
 			"form_field", "invoice")
-		ErrorResponse(c, response.CodeInvalidParams, "获取文件失败: "+err.Error())
+		response.ErrorResponse(c, response.CodeInvalidParams, "获取文件失败: "+err.Error())
 		return
 	}
 
 	// 从表单中获取reimbursement_id
 	reimbursementID := c.PostForm("reimbursement_id")
 	if reimbursementID == "" {
-		ErrorResponse(c, response.CodeInvalidParams, "缺少报销单ID reimbursement_id")
+		response.ErrorResponse(c, response.CodeInvalidParams, "缺少报销单ID reimbursement_id")
 		return
 	}
 
@@ -171,7 +140,7 @@ func (h *UploadHandler) UploadInvoices(c *gin.Context) {
 			"reimbursement_id", reimbursementID,
 			"filename", file.Filename,
 			"context", ctx)
-		ErrorResponse(c, response.CodeInternalError, err.Error())
+		response.ErrorResponse(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -179,7 +148,7 @@ func (h *UploadHandler) UploadInvoices(c *gin.Context) {
 	middleware.LogInfo(c, "发票上传处理完成",
 		"invoice_id", result.InvoiceID,
 		"reimbursement_id", reimbursementID)
-	SuccessResponse(c, result)
+	response.SuccessResponse(c, result)
 }
 
 // BatchUpload 批量上传处理
@@ -201,7 +170,7 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 	if err != nil {
 		middleware.LogError(c, "解析多文件表单失败",
 			"error", err.Error())
-		ErrorResponse(c, response.CodeInvalidParams, "解析表单失败: "+err.Error())
+		response.ErrorResponse(c, response.CodeInvalidParams, "解析表单失败: "+err.Error())
 		return
 	}
 
@@ -209,14 +178,14 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 	files := form.File["invoices"]
 	if len(files) == 0 {
 		middleware.LogWarn(c, "批量上传请求中未找到文件")
-		ErrorResponse(c, response.CodeInvalidParams, "未找到上传文件")
+		response.ErrorResponse(c, response.CodeInvalidParams, "未找到上传文件")
 		return
 	}
 
 	// 从表单中获取reimbursement_id
 	reimbursementID := c.PostForm("reimbursement_id")
 	if reimbursementID == "" {
-		ErrorResponse(c, response.CodeInvalidParams, "缺少报销单ID reimbursement_id")
+		response.ErrorResponse(c, response.CodeInvalidParams, "缺少报销单ID reimbursement_id")
 		return
 	}
 
@@ -234,7 +203,7 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 			"reimbursement_id", reimbursementID,
 			"file_count", len(files),
 			"context", ctx)
-		ErrorResponse(c, response.CodeInternalError, err.Error())
+		response.ErrorResponse(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -244,5 +213,5 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 		"total", result.TotalCount,
 		"success_count", result.SuccessCount,
 		"failure_count", result.FailedCount)
-	SuccessResponse(c, result)
+	response.SuccessResponse(c, result)
 }
