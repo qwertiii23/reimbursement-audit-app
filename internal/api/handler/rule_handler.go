@@ -22,11 +22,11 @@ import (
 
 // RuleHandler 处理规则管理请求的结构体
 type RuleHandler struct {
-	ruleService *rule.RuleService
+	ruleService rule.RuleServiceInterface
 }
 
 // NewRuleHandler 创建规则管理处理器实例
-func NewRuleHandler(ruleService *rule.RuleService) *RuleHandler {
+func NewRuleHandler(ruleService rule.RuleServiceInterface) *RuleHandler {
 	return &RuleHandler{
 		ruleService: ruleService,
 	}

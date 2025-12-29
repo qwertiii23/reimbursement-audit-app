@@ -70,6 +70,11 @@ func (l *Loader) LoadFromYAML() (*Config, error) {
 		return nil, fmt.Errorf("解析YAML配置失败: %w", err)
 	}
 
+	// 调试日志
+	fmt.Printf("DEBUG: YAML文件路径: %s\n", l.path)
+	fmt.Printf("DEBUG: 数据库配置 - Host: %s, Port: %d, Username: %s, DBName: %s\n",
+		config.Database.Host, config.Database.Port, config.Database.Username, config.Database.DBName)
+
 	return config, nil
 }
 

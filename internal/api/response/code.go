@@ -12,7 +12,7 @@ package response
 // 错误码常量定义
 const (
 	// 成功
-	CodeSuccess = 0
+	CodeSuccess = 200
 
 	// 系统错误 1000-1999
 	CodeInternalError    = 1000 // 内部服务器错误

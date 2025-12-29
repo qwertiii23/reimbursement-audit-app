@@ -99,6 +99,8 @@ func (s *RuleService) CreateRule(ctx context.Context, req *request.CreateRuleReq
 		UpdatedAt:   now,
 		CreatedAt:   now,
 		Version:     1,
+		Tags:        make(Tags, 0),     // 初始化为空切片
+		Metadata:    make(Metadata, 0), // 初始化为空map
 	}
 
 	// 保存规则
@@ -374,56 +376,59 @@ func (s *RuleService) DisableRule(ctx context.Context, id string) error {
 	return nil
 }
 
-// ValidateRules 执行规则校验
-func (s *RuleService) ValidateRules(ctx context.Context, data interface{}, ruleIDs []string) ([]*RuleValidationResult, error) {
-	// TODO: 实现规则校验逻辑
-	return nil, nil
-}
-
-// ValidateAllRules 执行所有规则校验
-func (s *RuleService) ValidateAllRules(ctx context.Context, data interface{}) ([]*RuleValidationResult, error) {
-	// TODO: 实现所有规则校验逻辑
-	return nil, nil
-}
-
-// ValidateRuleByType 按类型执行规则校验
-func (s *RuleService) ValidateRuleByType(ctx context.Context, data interface{}, ruleType string) ([]*RuleValidationResult, error) {
-	// TODO: 实现按类型规则校验逻辑
-	return nil, nil
-}
-
 // TestRule 测试规则
 func (s *RuleService) TestRule(ctx context.Context, rule *Rule, testData interface{}) (*RuleValidationResult, error) {
-	// TODO: 实现测试规则逻辑
-	return nil, nil
+	if rule == nil {
+		s.logger.WithContext(ctx).Error("规则不能为空")
+		return nil, errors.New("规则不能为空")
+	}
+
+	if testData == nil {
+		s.logger.WithContext(ctx).Error("测试数据不能为空")
+		return nil, errors.New("测试数据不能为空")
+	}
+
+	s.logger.WithContext(ctx).Info("开始测试规则",
+		logger.NewField("rule_id", rule.ID),
+		logger.NewField("rule_name", rule.Name))
+
+	result, err := s.engine.ExecuteRule(ctx, rule.ID, testData)
+	if err != nil {
+		s.logger.WithContext(ctx).Error("测试规则失败",
+			logger.NewField("rule_id", rule.ID),
+			logger.NewField("error", err.Error()))
+		return nil, err
+	}
+
+	result.RuleID = rule.ID
+	result.RuleName = rule.Name
+	result.RuleType = rule.Type
+
+	s.logger.WithContext(ctx).Info("测试规则完成",
+		logger.NewField("rule_id", rule.ID),
+		logger.NewField("passed", result.Passed))
+
+	return result, nil
 }
 
-// LoadRules 加载规则
-func (s *RuleService) LoadRules(ctx context.Context) error {
-	// TODO: 实现加载规则逻辑
-	return nil
-}
+// ValidateAllRules 验证所有启用的规则
+func (s *RuleService) ValidateAllRules(ctx context.Context, data interface{}) ([]*RuleValidationResult, error) {
+	if data == nil {
+		s.logger.WithContext(ctx).Error("验证数据不能为空")
+		return nil, errors.New("验证数据不能为空")
+	}
 
-// ReloadRules 重新加载规则
-func (s *RuleService) ReloadRules(ctx context.Context) error {
-	// TODO: 实现重新加载规则逻辑
-	return nil
-}
+	s.logger.WithContext(ctx).Info("开始验证所有规则")
 
-// GetRuleTypes 获取规则类型列表
-func (s *RuleService) GetRuleTypes(ctx context.Context) ([]string, error) {
-	// TODO: 实现获取规则类型列表逻辑
-	return []string{RuleTypeAmount, RuleTypeFrequency, RuleTypeInvoice, RuleTypeCompliance, RuleTypeCustom}, nil
-}
+	results, err := s.engine.ExecuteAllRules(ctx, data)
+	if err != nil {
+		s.logger.WithContext(ctx).Error("验证所有规则失败",
+			logger.NewField("error", err.Error()))
+		return nil, err
+	}
 
-// ResolveRuleConflicts 解决规则冲突
-func (s *RuleService) ResolveRuleConflicts(results []*RuleValidationResult) []*RuleValidationResult {
-	// TODO: 实现解决规则冲突逻辑
-	return nil
-}
+	s.logger.WithContext(ctx).Info("验证所有规则完成",
+		logger.NewField("result_count", len(results)))
 
-// SortRulesByPriority 按优先级排序规则
-func (s *RuleService) SortRulesByPriority(rules []*Rule) []*Rule {
-	// TODO: 实现按优先级排序规则逻辑
-	return nil
+	return results, nil
 }

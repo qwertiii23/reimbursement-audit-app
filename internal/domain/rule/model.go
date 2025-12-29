@@ -9,27 +9,72 @@
 
 package rule
 
-import "time"
+import (
+	"database/sql/driver"
+	"encoding/json"
+	"time"
+	"errors"
+)
 
 // Rule 规则模型
 type Rule struct {
-	ID          string                 `json:"id" gorm:"primaryKey"`         // 规则ID
-	RuleCode    string                 `json:"rule_code" gorm:"uniqueIndex"` // 规则编码(唯一)
-	Name        string                 `json:"name"`                         // 规则名称
-	Description string                 `json:"description"`                  // 规则描述
-	Type        string                 `json:"type"`                         // 规则类型(金额/频次/发票/合规等)
-	Category    string                 `json:"category"`                     // 规则分类
-	Status      string                 `json:"status"`                       // 规则状态(启用/禁用/草稿)
-	Definition  string                 `json:"definition"`                   // 规则定义(Grule语法)
-	Priority    int                    `json:"priority"`                     // 优先级(数字越大优先级越高)
-	Enabled     bool                   `json:"enabled"`                      // 是否启用
-	CreatedBy   string                 `json:"created_by"`                   // 创建人
-	UpdatedBy   string                 `json:"updated_by"`                   // 更新人
-	CreatedAt   time.Time              `json:"created_at"`                   // 创建时间
-	UpdatedAt   time.Time              `json:"updated_at"`                   // 更新时间
-	Version     int                    `json:"version"`                      // 版本号
-	Tags        []string               `json:"tags"`                         // 标签
-	Metadata    map[string]interface{} `json:"metadata"`                     // 元数据
+	ID          string                 `json:"id" gorm:"primaryKey;type:varchar(36)"`         // 规则ID
+	RuleCode    string                 `json:"rule_code" gorm:"type:varchar(50);uniqueIndex"` // 规则编码(唯一)
+	Name        string                 `json:"name" gorm:"type:varchar(100)"`                 // 规则名称
+	Description string                 `json:"description" gorm:"type:text"`                  // 规则描述
+	Type        string                 `json:"type" gorm:"type:varchar(50)"`                  // 规则类型(金额/频次/发票/合规等)
+	Category    string                 `json:"category" gorm:"type:varchar(50)"`              // 规则分类
+	Status      string                 `json:"status" gorm:"type:varchar(20)"`                // 规则状态(启用/禁用/草稿)
+	Definition  string                 `json:"definition" gorm:"type:text"`                   // 规则定义(Grule语法)
+	Priority    int                    `json:"priority"`                                      // 优先级(数字越大优先级越高)
+	Enabled     bool                   `json:"enabled"`                                       // 是否启用
+	CreatedBy   string                 `json:"created_by" gorm:"type:varchar(50)"`            // 创建人
+	UpdatedBy   string                 `json:"updated_by" gorm:"type:varchar(50)"`            // 更新人
+	CreatedAt   time.Time              `json:"created_at"`                                    // 创建时间
+	UpdatedAt   time.Time              `json:"updated_at"`                                    // 更新时间
+	Version     int                    `json:"version"`                                       // 版本号
+	Tags        Tags                   `json:"tags" gorm:"type:json"`                         // 标签
+	Metadata    Metadata               `json:"metadata" gorm:"type:json"`                     // 元数据
+}
+
+// Tags 自定义类型用于处理标签数组
+type Tags []string
+
+// Value 实现driver.Valuer接口，用于将Tags转换为数据库可存储的值
+func (t Tags) Value() (driver.Value, error) {
+	if len(t) == 0 {
+		return "[]", nil
+	}
+	return json.Marshal(t)
+}
+
+// Scan 实现sql.Scanner接口，用于从数据库读取值到Tags
+func (t *Tags) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("cannot scan non-bytes value into Tags")
+	}
+	return json.Unmarshal(bytes, &t)
+}
+
+// Metadata 自定义类型用于处理元数据map
+type Metadata map[string]interface{}
+
+// Value 实现driver.Valuer接口，用于将Metadata转换为数据库可存储的值
+func (m Metadata) Value() (driver.Value, error) {
+	if len(m) == 0 {
+		return "{}", nil
+	}
+	return json.Marshal(m)
+}
+
+// Scan 实现sql.Scanner接口，用于从数据库读取值到Metadata
+func (m *Metadata) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("cannot scan non-bytes value into Metadata")
+	}
+	return json.Unmarshal(bytes, &m)
 }
 
 // RuleValidationResult 规则校验结果模型

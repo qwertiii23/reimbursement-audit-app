@@ -15,6 +15,7 @@ import "fmt"
 type Config struct {
 	Server   ServerConfig   `json:"server" yaml:"server"`     // 服务器配置
 	Database DatabaseConfig `json:"database" yaml:"database"` // 数据库配置
+	Postgres PostgresConfig `json:"postgres" yaml:"postgres"` // PostgreSQL配置
 	Redis    RedisConfig    `json:"redis" yaml:"redis"`       // Redis配置
 	LLM      LLMConfig      `json:"llm" yaml:"llm"`           // 大模型配置
 	OCR      OCRConfig      `json:"ocr" yaml:"ocr"`           // OCR配置
@@ -28,21 +29,37 @@ type Config struct {
 type ServerConfig struct {
 	Host         string `json:"host" yaml:"host"`                   // 服务器主机
 	Port         int    `json:"port" yaml:"port"`                   // 服务器端口
-	ReadTimeout  int    `json:"read_timeout" yaml:"read_timeout"`   // 读超时时间(秒)
-	WriteTimeout int    `json:"write_timeout" yaml:"write_timeout"` // 写超时时间(秒)
-	IdleTimeout  int    `json:"idle_timeout" yaml:"idle_timeout"`   // 空闲超时时间(秒)
+	ReadTimeout  string `json:"read_timeout" yaml:"read_timeout"`   // 读超时时间
+	WriteTimeout string `json:"write_timeout" yaml:"write_timeout"` // 写超时时间
+	IdleTimeout  string `json:"idle_timeout" yaml:"idle_timeout"`   // 空闲超时时间
 }
 
 // DatabaseConfig 数据库配置
 type DatabaseConfig struct {
-	Host         string `json:"host" yaml:"host"`                     // 数据库主机
-	Port         int    `json:"port" yaml:"port"`                     // 数据库端口
-	Username     string `json:"username" yaml:"username"`             // 用户名
-	Password     string `json:"password" yaml:"password"`             // 密码
-	DBName       string `json:"dbname" yaml:"dbname"`                 // 数据库名
-	SSLMode      string `json:"sslmode" yaml:"sslmode"`               // SSL模式
-	MaxOpenConns int    `json:"max_open_conns" yaml:"max_open_conns"` // 最大打开连接数
-	MaxIdleConns int    `json:"max_idle_conns" yaml:"max_idle_conns"` // 最大空闲连接数
+	Host            string `json:"host" yaml:"host"`                             // 数据库主机
+	Port            int    `json:"port" yaml:"port"`                             // 数据库端口
+	Username        string `json:"username" yaml:"username"`                     // 用户名
+	Password        string `json:"password" yaml:"password"`                     // 密码
+	DBName          string `json:"dbname" yaml:"dbname"`                         // 数据库名
+	Charset         string `json:"charset" yaml:"charset"`                       // 字符集
+	Collation       string `json:"collation" yaml:"collation"`                   // 排序规则
+	ParseTime       bool   `json:"parse_time" yaml:"parse_time"`                 // 是否解析时间
+	Loc             string `json:"loc" yaml:"loc"`                               // 时区
+	SSLMode         string `json:"sslmode" yaml:"sslmode"`                       // SSL模式
+	MaxOpenConns    int    `json:"max_open_conns" yaml:"max_open_conns"`         // 最大打开连接数
+	MaxIdleConns    int    `json:"max_idle_conns" yaml:"max_idle_conns"`         // 最大空闲连接数
+	ConnMaxLifetime string `json:"conn_max_lifetime" yaml:"conn_max_lifetime"`   // 连接最大生命周期
+	ConnMaxIdleTime string `json:"conn_max_idle_time" yaml:"conn_max_idle_time"` // 连接最大空闲时间
+}
+
+// PostgresConfig PostgreSQL配置
+type PostgresConfig struct {
+	Host     string `json:"host" yaml:"host"`         // PostgreSQL主机
+	Port     int    `json:"port" yaml:"port"`         // PostgreSQL端口
+	Username string `json:"username" yaml:"username"` // 用户名
+	Password string `json:"password" yaml:"password"` // 密码
+	DBName   string `json:"dbname" yaml:"dbname"`     // 数据库名
+	SSLMode  string `json:"sslmode" yaml:"sslmode"`   // SSL模式
 }
 
 // RedisConfig Redis配置

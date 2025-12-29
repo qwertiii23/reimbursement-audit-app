@@ -10,9 +10,12 @@ import (
 	"reimbursement-audit/internal/api/middleware"
 	"reimbursement-audit/internal/application/service"
 	"reimbursement-audit/internal/config"
+	"reimbursement-audit/internal/domain/audit"
 	"reimbursement-audit/internal/domain/ocr"
 	"reimbursement-audit/internal/domain/ocr/provider"
+	"reimbursement-audit/internal/domain/rag"
 	"reimbursement-audit/internal/domain/reimbursement"
+	"reimbursement-audit/internal/domain/rule"
 	storage "reimbursement-audit/internal/infra/storage/file"
 	mysqlRepo "reimbursement-audit/internal/infra/storage/mysql"
 	"reimbursement-audit/internal/pkg/logger"
@@ -101,10 +104,43 @@ func (s *serverImpl) RegisterRoutes() {
 	s.engine.GET("/ready", ReadyCheck)
 	s.engine.GET("/version", VersionCheck("1.0.0"))
 
+	// 调试：检查配置是否正确加载
+	loggerInstance.Info("数据库配置信息",
+		logger.NewField("host", s.appConfig.Database.Host),
+		logger.NewField("port", s.appConfig.Database.Port),
+		logger.NewField("username", s.appConfig.Database.Username),
+		logger.NewField("password", s.appConfig.Database.Password),
+		logger.NewField("dbname", s.appConfig.Database.DBName))
+
 	// 创建MySQL客户端（实际应该从依赖注入获取）
 	mysqlClient := mysqlRepo.NewClient(loggerInstance)
-	// TODO: 这里应该从配置中获取数据库连接信息
-	// mysqlClient.Connect(ctx, config)
+
+	// 从配置中获取数据库连接信息并连接
+	mysqlConfig := &mysqlRepo.Config{
+		Host:            s.appConfig.Database.Host,
+		Port:            s.appConfig.Database.Port,
+		Username:        s.appConfig.Database.Username,
+		Password:        s.appConfig.Database.Password,
+		DBName:          s.appConfig.Database.DBName,
+		Charset:         "utf8mb4",
+		Collation:       "utf8mb4_unicode_ci",
+		ParseTime:       true,
+		Loc:             "Local",
+		MaxOpenConns:    s.appConfig.Database.MaxOpenConns,
+		MaxIdleConns:    s.appConfig.Database.MaxIdleConns,
+		ConnMaxLifetime: 0,
+		ConnMaxIdleTime: 0,
+		EnableLog:       true,
+		LogLevel:        "info",
+		SlowThreshold:   200,
+		MaxRetries:      3,
+		RetryDelay:      1000,
+	}
+
+	ctx := context.Background()
+	if err := mysqlClient.Connect(ctx, mysqlConfig); err != nil {
+		panic(fmt.Sprintf("数据库连接失败: %v", err))
+	}
 
 	// 创建文件存储服务
 	// TODO: 从配置中获取存储路径和URL
@@ -152,6 +188,51 @@ func (s *serverImpl) RegisterRoutes() {
 		loggerInstance,
 	)
 
+	// 创建规则仓储和规则引擎
+	ruleRepo := mysqlRepo.NewRuleRepository(mysqlClient, loggerInstance)
+	ruleEngine := rule.NewGRuleEngine(ruleRepo, loggerInstance)
+
+	// 初始化规则引擎
+	if err := ruleEngine.Initialize(ctx); err != nil {
+		loggerInstance.Error("规则引擎初始化失败", logger.NewField("error", err.Error()))
+	}
+
+	ruleService := rule.NewRuleService(ruleRepo, loggerInstance, ruleEngine)
+
+	// 创建RAG服务
+	llmClient := rag.NewLLMClient(
+		s.appConfig.LLM.APIKey,
+		s.appConfig.LLM.BaseURL,
+		s.appConfig.LLM.Model,
+		s.appConfig.LLM.Timeout,
+		loggerInstance,
+	)
+
+	documentProcessor := rag.NewDocumentProcessor(500, 50, loggerInstance)
+	promptBuilder := rag.NewPromptBuilder(loggerInstance)
+
+	// 创建向量存储（使用PostgreSQL+PGVector）
+	vectorStore, err := rag.NewVectorStore(
+		fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+			s.appConfig.Postgres.Host,
+			s.appConfig.Postgres.Port,
+			s.appConfig.Postgres.Username,
+			s.appConfig.Postgres.Password,
+			s.appConfig.Postgres.DBName,
+			s.appConfig.Postgres.SSLMode),
+		loggerInstance,
+	)
+	if err != nil {
+		loggerInstance.Error("创建向量存储失败", logger.NewField("error", err.Error()))
+	}
+
+	ragService := rag.NewRAGService(loggerInstance, llmClient, documentProcessor, vectorStore, promptBuilder)
+
+	// 创建审核仓储和审核服务
+	auditRepo := mysqlRepo.NewAuditRepository(mysqlClient, loggerInstance)
+	auditDomainService := audit.NewService(auditRepo, reimbursementRepo, ruleService, ragService, loggerInstance)
+	auditAppService := service.NewAuditApplicationService(auditDomainService, loggerInstance)
+
 	// 创建上传处理器
 	uploadHandler := handler.NewUploadHandler(reimbursementAppService)
 
@@ -160,13 +241,40 @@ func (s *serverImpl) RegisterRoutes() {
 	s.engine.POST("/api/v1/invoices/upload", uploadHandler.UploadInvoices)
 	s.engine.POST("/api/v1/invoices/batch-upload", uploadHandler.BatchUpload)
 
-	// TODO: 注册其他路由
-	// s.engine.POST("/api/v1/audit", auditHandler)
-	// s.engine.GET("/api/v1/query", queryHandler)
-	// s.engine.POST("/api/v1/rules", createRuleHandler)
-	// s.engine.PUT("/api/v1/rules/:id", updateRuleHandler)
-	// s.engine.DELETE("/api/v1/rules/:id", deleteRuleHandler)
-	// s.engine.GET("/api/v1/rules", listRulesHandler)
+	// 创建审核处理器
+	auditHandler := handler.NewAuditHandler(auditAppService)
+
+	// 注册审核相关路由
+	s.engine.POST("/api/v1/audit", auditHandler.StartAudit)
+	s.engine.GET("/api/v1/audit/:id/status", auditHandler.GetAuditStatus)
+	s.engine.GET("/api/v1/audit/:id/result", auditHandler.GetAuditResult)
+	s.engine.POST("/api/v1/audit/:id/retry", auditHandler.RetryAudit)
+
+	// 创建规则处理器
+	ruleHandler := handler.NewRuleHandler(ruleService)
+
+	// 注册规则相关路由
+	s.engine.POST("/api/v1/rules", ruleHandler.CreateRule)
+	s.engine.PUT("/api/v1/rules/:id", ruleHandler.UpdateRule)
+	s.engine.DELETE("/api/v1/rules/:id", ruleHandler.DeleteRule)
+	s.engine.GET("/api/v1/rules", ruleHandler.GetRules)
+	s.engine.PATCH("/api/v1/rules/:id/enable", ruleHandler.EnableRule)
+	s.engine.PATCH("/api/v1/rules/:id/disable", ruleHandler.DisableRule)
+	s.engine.POST("/api/v1/rules/:id/test", ruleHandler.TestRule)
+
+	// 创建查询处理器
+	queryHandler := handler.NewQueryHandler(
+		reimbursementAppService,
+		reimbursementRepo,
+		auditDomainService,
+		loggerInstance,
+	)
+
+	// 注册查询相关路由
+	s.engine.GET("/api/v1/reimbursement/:id", queryHandler.GetReimbursementByID)
+	s.engine.GET("/api/v1/reimbursements/user", queryHandler.GetReimbursementsByUserID)
+	s.engine.GET("/api/v1/reimbursements/date-range", queryHandler.GetReimbursementsByDateRange)
+	s.engine.GET("/api/v1/reimbursement/:id/audit-report", queryHandler.GetAuditReport)
 }
 
 // SetupMiddleware 设置中间件
