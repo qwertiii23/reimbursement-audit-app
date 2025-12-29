@@ -48,9 +48,25 @@ func main() {
 	}
 
 	// 创建MySQL客户端
-	dbConfig := mysql.DefaultConfig()
-	if cfg != nil {
-		// TODO: 从配置中设置数据库参数
+	dbConfig := &mysql.Config{
+		Host:            cfg.Database.Host,
+		Port:            cfg.Database.Port,
+		Username:        cfg.Database.Username,
+		Password:        cfg.Database.Password,
+		DBName:          cfg.Database.DBName,
+		Charset:         cfg.Database.Charset,
+		Collation:       cfg.Database.Collation,
+		ParseTime:       cfg.Database.ParseTime,
+		Loc:             cfg.Database.Loc,
+		MaxOpenConns:    cfg.Database.MaxOpenConns,
+		MaxIdleConns:    cfg.Database.MaxIdleConns,
+		ConnMaxLifetime: 0,
+		ConnMaxIdleTime: 0,
+		EnableLog:       true,
+		LogLevel:        "info",
+		SlowThreshold:   200,
+		MaxRetries:      3,
+		RetryDelay:      1000,
 	}
 
 	// 创建日志记录器

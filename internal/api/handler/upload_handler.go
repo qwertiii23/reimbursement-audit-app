@@ -22,11 +22,11 @@ import (
 
 // UploadHandler 处理文件上传的结构体
 type UploadHandler struct {
-	reimbursementAppService *service.ReimbursementApplicationService
+	reimbursementAppService service.ReimbursementApplicationServiceInterface
 }
 
 // NewUploadHandler 创建上传处理器实例
-func NewUploadHandler(reimbursementAppService *service.ReimbursementApplicationService) *UploadHandler {
+func NewUploadHandler(reimbursementAppService service.ReimbursementApplicationServiceInterface) *UploadHandler {
 	return &UploadHandler{
 		reimbursementAppService: reimbursementAppService,
 	}

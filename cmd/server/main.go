@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	configFile = flag.String("config", "config.yaml", "配置文件路径")
+	configFile = flag.String("config", "configs/config.dev.yaml", "配置文件路径")
 	version    = flag.Bool("version", false, "显示版本信息")
 	help       = flag.Bool("help", false, "显示帮助信息")
 	buildTime  = "unknown" // 构建时间，由编译时设置
@@ -50,12 +50,16 @@ func main() {
 	}
 
 	// 转换服务器配置
+	readTimeout, _ := time.ParseDuration(cfg.Server.ReadTimeout)
+	writeTimeout, _ := time.ParseDuration(cfg.Server.WriteTimeout)
+	idleTimeout, _ := time.ParseDuration(cfg.Server.IdleTimeout)
+
 	serverConfig := &server.Config{
 		Host:         cfg.Server.Host,
 		Port:         cfg.Server.Port,
-		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
-		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  idleTimeout,
 		Mode:         gin.ReleaseMode,
 		TLS:          false,
 	}
