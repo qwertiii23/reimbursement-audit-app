@@ -132,8 +132,15 @@ func (h *UploadHandler) UploadInvoices(c *gin.Context) {
 		return
 	}
 
+	// 从表单中获取category（发票商品种类）
+	category := c.PostForm("category")
+	if category == "" {
+		response.ErrorResponse(c, response.CodeInvalidParams, "缺少发票商品种类 category")
+		return
+	}
+
 	// 调用应用服务处理业务逻辑
-	result, err := h.reimbursementAppService.UploadInvoice(ctx, reimbursementID, file)
+	result, err := h.reimbursementAppService.UploadInvoice(ctx, reimbursementID, category, file)
 	if err != nil {
 		middleware.LogError(c, "上传发票失败",
 			"error", err.Error(),
@@ -189,6 +196,13 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 		return
 	}
 
+	// 从表单中获取category（发票商品种类）
+	category := c.PostForm("category")
+	if category == "" {
+		response.ErrorResponse(c, response.CodeInvalidParams, "缺少发票商品种类 category")
+		return
+	}
+
 	// 调用应用服务处理业务逻辑
 	// 转换文件类型以匹配应用服务接口
 	fileHeaders := make([]interface{}, len(files))
@@ -196,7 +210,7 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 		fileHeaders[i] = file
 	}
 
-	result, err := h.reimbursementAppService.BatchUploadInvoices(ctx, reimbursementID, fileHeaders)
+	result, err := h.reimbursementAppService.BatchUploadInvoices(ctx, reimbursementID, category, fileHeaders)
 	if err != nil {
 		middleware.LogError(c, "批量上传发票失败",
 			"error", err.Error(),
@@ -214,4 +228,47 @@ func (h *UploadHandler) BatchUpload(c *gin.Context) {
 		"success_count", result.SuccessCount,
 		"failure_count", result.FailedCount)
 	response.SuccessResponse(c, result)
+}
+
+// TriggerOCRParsing 触发发票OCR解析
+func (h *UploadHandler) TriggerOCRParsing(c *gin.Context) {
+	middleware.LogInfo(c, "开始处理OCR解析触发请求",
+		"path", c.Request.URL.Path,
+		"method", c.Request.Method,
+		"remote_addr", c.ClientIP())
+
+	invoiceID := c.Query("invoice_id")
+	if invoiceID == "" {
+		middleware.LogError(c, "缺少invoice_id参数")
+		response.ErrorResponse(c, response.CodeInvalidParams, "缺少invoice_id参数")
+		return
+	}
+
+	category := c.Query("category")
+	if category != "" {
+		traceId := middleware.GetTraceId(c)
+		ctx := middleware.WithTraceId(context.Background(), traceId)
+
+		err := h.reimbursementAppService.UpdateInvoiceCategory(ctx, invoiceID, category)
+		if err != nil {
+			middleware.LogError(c, "更新发票商品种类失败",
+				"error", err.Error(),
+				"invoice_id", invoiceID,
+				"category", category)
+			response.ErrorResponse(c, response.CodeInternalError, "更新发票商品种类失败: "+err.Error())
+			return
+		}
+	}
+
+	traceId := middleware.GetTraceId(c)
+	ctx := middleware.WithTraceId(context.Background(), traceId)
+
+	go h.reimbursementAppService.ProcessOCRAsync(ctx, invoiceID)
+
+	middleware.LogInfo(c, "OCR解析已触发",
+		"invoice_id", invoiceID)
+	response.SuccessResponse(c, gin.H{
+		"invoice_id": invoiceID,
+		"status":     "OCR解析已触发",
+	})
 }

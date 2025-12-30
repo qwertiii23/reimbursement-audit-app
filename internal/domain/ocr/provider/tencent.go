@@ -136,6 +136,17 @@ func (p *TencentProvider) parseResponse(response *tccr.VatInvoiceOCRResponse) (*
 		RawText:   p.getRawText(response),
 	}
 
+	if response.Response.VatInvoiceInfos != nil {
+		for i, item := range response.Response.VatInvoiceInfos {
+			if item.Name != nil && item.Value != nil {
+				p.logger.Info("解析OCR响应",
+					logger.NewField("index", i),
+					logger.NewField("name", *item.Name),
+					logger.NewField("value", *item.Value))
+			}
+		}
+	}
+
 	// 解析发票基本信息
 	if response.Response.VatInvoiceInfos != nil {
 		for _, item := range response.Response.VatInvoiceInfos {
@@ -144,36 +155,64 @@ func (p *TencentProvider) parseResponse(response *tccr.VatInvoiceOCRResponse) (*
 				value := *item.Value
 
 				switch name {
-				case "发票代码":
-					invoiceInfo.InvoiceCode = value
 				case "发票号码":
 					invoiceInfo.InvoiceNumber = value
 				case "发票类型":
 					invoiceInfo.InvoiceType = value
+				case "发票名称":
+					invoiceInfo.InvoiceName = value
 				case "开票日期":
 					invoiceInfo.InvoiceDate = value
 				case "合计金额":
 					invoiceInfo.TotalAmount = p.parseFloat(value)
 				case "合计税额":
 					invoiceInfo.TaxAmount = p.parseFloat(value)
-				case "价税合计":
+				case "价税合计(小写)":
 					invoiceInfo.TotalWithTax = p.parseFloat(value)
+				case "价税合计(大写)":
+					invoiceInfo.TotalAmountInWords = value
 				case "购买方名称":
 					invoiceInfo.BuyerName = value
-				case "购买方识别号":
+				case "购买方统一社会信用代码/纳税人识别号", "购买方识别号":
 					invoiceInfo.BuyerTaxNumber = value
 				case "销售方名称":
 					invoiceInfo.SellerName = value
-				case "销售方识别号":
+				case "销售方统一社会信用代码/纳税人识别号", "销售方识别号":
 					invoiceInfo.SellerTaxNumber = value
 				case "校验码":
 					invoiceInfo.CheckCode = value
 				case "密码区":
 					invoiceInfo.PasswordArea = value
+				case "开票人":
+					invoiceInfo.Drawer = value
+				case "小计金额":
+					invoiceInfo.SubtotalAmount = p.parseFloat(value)
+				case "小计税额":
+					invoiceInfo.SubtotalTax = p.parseFloat(value)
+				case "备注":
+					invoiceInfo.Remarks = value
 				}
 			}
 		}
 	}
+
+	//p.logger.Info("解析OCR响应",
+	//	logger.NewField("invoice_number", invoiceInfo.InvoiceNumber),
+	//	logger.NewField("invoice_type", invoiceInfo.InvoiceType),
+	//	logger.NewField("invoice_date", invoiceInfo.InvoiceDate),
+	//	logger.NewField("total_amount", invoiceInfo.TotalAmount),
+	//	logger.NewField("tax_amount", invoiceInfo.TaxAmount),
+	//	logger.NewField("total_with_tax", invoiceInfo.TotalWithTax),
+	//	logger.NewField("buyer_name", invoiceInfo.BuyerName),
+	//	logger.NewField("buyer_tax_number", invoiceInfo.BuyerTaxNumber),
+	//	logger.NewField("seller_name", invoiceInfo.SellerName),
+	//	logger.NewField("seller_tax_number", invoiceInfo.SellerTaxNumber),
+	//	logger.NewField("check_code", invoiceInfo.CheckCode),
+	//	logger.NewField("password_area", invoiceInfo.PasswordArea),
+	//	logger.NewField("is_valid", invoiceInfo.IsValid),
+	//	logger.NewField("error_message", invoiceInfo.ErrorMessage),
+	//	logger.NewField("raw_text", invoiceInfo.RawText),
+	//	logger.NewField("parse_time", invoiceInfo.ParseTime))
 
 	return invoiceInfo, nil
 }
@@ -189,12 +228,22 @@ func (p *TencentProvider) getRawText(response *tccr.VatInvoiceOCRResponse) strin
 
 // parseFloat 解析浮点数
 func (p *TencentProvider) parseFloat(s string) float64 {
-	// 移除可能的逗号和其他非数字字符
-	cleaned := strings.ReplaceAll(s, ",", "")
+	if s == "" {
+		return 0
+	}
+
+	cleaned := s
+	cleaned = strings.ReplaceAll(cleaned, ",", "")
 	cleaned = strings.ReplaceAll(cleaned, " ", "")
+	cleaned = strings.ReplaceAll(cleaned, "¥", "")
+	cleaned = strings.ReplaceAll(cleaned, "$", "")
 
 	result, err := strconv.ParseFloat(cleaned, 64)
 	if err != nil {
+		p.logger.Debug("解析浮点数失败",
+			logger.NewField("original", s),
+			logger.NewField("cleaned", cleaned),
+			logger.NewField("error", err.Error()))
 		return 0
 	}
 	return result

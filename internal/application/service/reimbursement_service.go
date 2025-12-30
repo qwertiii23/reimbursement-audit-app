@@ -75,13 +75,15 @@ func (s *ReimbursementApplicationService) CreateReimbursement(ctx context.Contex
 		ExpenseDate: req.ExpenseDate,
 	}
 
-	// 调用领域服务创建报销单
 	reimbursementModel, err := s.reimbursementService.CreateReimbursement(ctx, domainReq)
 	if err != nil {
 		return nil, fmt.Errorf("创建报销单失败: %w", err)
 	}
 
-	// 创建响应数据
+	if err := s.reimbursementRepo.CreateReimbursement(ctx, reimbursementModel); err != nil {
+		return nil, fmt.Errorf("保存报销单失败: %w", err)
+	}
+
 	return response.NewReimbursementUploadResponse(
 		reimbursementModel.ID,
 		reimbursementModel.UserID,
@@ -94,7 +96,7 @@ func (s *ReimbursementApplicationService) CreateReimbursement(ctx context.Contex
 }
 
 // UploadInvoice 上传发票用例
-func (s *ReimbursementApplicationService) UploadInvoice(ctx context.Context, reimbursementID string, fileHeader *multipart.FileHeader) (*response.InvoiceUploadResponse, error) {
+func (s *ReimbursementApplicationService) UploadInvoice(ctx context.Context, reimbursementID string, invoiceType string, fileHeader *multipart.FileHeader) (*response.InvoiceUploadResponse, error) {
 	// 验证报销单是否存在
 	_, err := s.reimbursementRepo.GetReimbursementByID(ctx, reimbursementID)
 	if err != nil {
@@ -112,8 +114,9 @@ func (s *ReimbursementApplicationService) UploadInvoice(ctx context.Context, rei
 	invoice := &ocr.Invoice{
 		ID:              uuid.New().String(),
 		ReimbursementID: reimbursementID,
+		Type:            invoiceType,
 		ImagePath:       fileInfo.Path,
-		Status:          "待识别", // 初始状态为待识别，等待OCR处理
+		Status:          "待识别",
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -137,7 +140,7 @@ func (s *ReimbursementApplicationService) UploadInvoice(ctx context.Context, rei
 }
 
 // BatchUploadInvoices 批量上传发票用例
-func (s *ReimbursementApplicationService) BatchUploadInvoices(ctx context.Context, reimbursementID string, fileHeaders []interface{}) (*response.BatchUploadResponse, error) {
+func (s *ReimbursementApplicationService) BatchUploadInvoices(ctx context.Context, reimbursementID string, category string, fileHeaders []interface{}) (*response.BatchUploadResponse, error) {
 	// 验证报销单是否存在
 	_, err := s.reimbursementRepo.GetReimbursementByID(ctx, reimbursementID)
 	if err != nil {
@@ -285,4 +288,29 @@ func (s *ReimbursementApplicationService) processBatchOCRAsync(ctx context.Conte
 				logger.NewField("invoice_id", invoice.ID))
 		}
 	}
+}
+
+// ProcessOCRAsync 公开的异步OCR解析方法
+func (s *ReimbursementApplicationService) ProcessOCRAsync(ctx context.Context, invoiceID string) {
+	s.processOCRAsync(ctx, invoiceID)
+}
+
+func (s *ReimbursementApplicationService) UpdateInvoiceType(ctx context.Context, invoiceID string, invoiceType string) error {
+	invoice, err := s.ocrRepo.GetInvoiceByID(ctx, invoiceID)
+	if err != nil {
+		return fmt.Errorf("获取发票信息失败: %w", err)
+	}
+
+	invoice.Type = invoiceType
+	invoice.UpdatedAt = time.Now()
+
+	if err := s.ocrRepo.UpdateInvoice(ctx, invoice); err != nil {
+		return fmt.Errorf("更新发票类型失败: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReimbursementApplicationService) UpdateInvoiceCategory(ctx context.Context, invoiceID string, category string) error {
+	return s.UpdateInvoiceType(ctx, invoiceID, category)
 }

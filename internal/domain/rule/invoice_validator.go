@@ -237,9 +237,9 @@ func (v *InvoiceValidatorImpl) loadRulesFromDatabase(ctx context.Context) ([]*Ru
 
 	// 从数据库查询所有启用的规则
 	filter := &RuleFilter{
-		Category: "发票校验",
-		Status:   "enabled",
-		Size:     1000,
+		Type:   "invoice_validation",
+		Status: "enabled",
+		Size:   1000,
 	}
 
 	rules, _, err := v.repository.ListRules(ctx, filter)

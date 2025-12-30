@@ -13,6 +13,8 @@ import (
 type ReimbursementApplicationServiceInterface interface {
 	GetReimbursementDetail(ctx context.Context, id string) (*reimbursement.Reimbursement, error)
 	CreateReimbursement(ctx context.Context, req *request.ReimbursementUploadRequest) (*response.ReimbursementUploadResponse, error)
-	UploadInvoice(ctx context.Context, reimbursementID string, fileHeader *multipart.FileHeader) (*response.InvoiceUploadResponse, error)
-	BatchUploadInvoices(ctx context.Context, reimbursementID string, fileHeaders []interface{}) (*response.BatchUploadResponse, error)
+	UploadInvoice(ctx context.Context, reimbursementID string, category string, fileHeader *multipart.FileHeader) (*response.InvoiceUploadResponse, error)
+	BatchUploadInvoices(ctx context.Context, reimbursementID string, category string, fileHeaders []interface{}) (*response.BatchUploadResponse, error)
+	ProcessOCRAsync(ctx context.Context, invoiceID string)
+	UpdateInvoiceCategory(ctx context.Context, invoiceID string, category string) error
 }

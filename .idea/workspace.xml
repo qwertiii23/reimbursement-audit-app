@@ -5,29 +5,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c99502e4-42b0-41ee-8127-da27adbb99a3" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/sql/create_rules_table.sql" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/migrate/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/migrate/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/server/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/server/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bin/server" beforeDir="false" afterPath="$PROJECT_DIR$/bin/server" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/configs/config.dev.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/configs/config.dev.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/configs/config.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/configs/config.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/handler/audit_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/audit_handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/handler/query_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/query_handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/handler/rule_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/rule_handler.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/api/handler/upload_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/upload_handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/response/code.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/response/code.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/application/service/reimbursement_service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/application/service/reimbursement_service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/application/service/service_interface.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/application/service/service_interface.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/config/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/config/config.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/config/loader.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/config/loader.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/audit/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/audit/service.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/domain/ocr/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/ocr/model.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/ocr/provider/tencent.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/ocr/provider/tencent.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/ocr/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/ocr/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rag/llm_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rag/llm_client.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rag/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rag/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rag/vector_store.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rag/vector_store.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/domain/reimbursement/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/reimbursement/model.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/domain/rule/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/model.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/domain/rule/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/infra/storage/mysql/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/infra/storage/mysql/config.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/infra/storage/mysql/migration/migration.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/infra/storage/mysql/migration/migration.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/reimbursement/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/reimbursement/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rule/grule_engine.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/grule_engine.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rule/invoice_rule_execution.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/invoice_rule_execution.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/rule/invoice_validator.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/invoice_validator.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/infra/storage/mysql/ocr_repository.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/infra/storage/mysql/ocr_repository.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/infra/storage/mysql/reimbursement_repository.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/infra/storage/mysql/reimbursement_repository.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/server/impl.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/server/impl.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server" beforeDir="false" afterPath="$PROJECT_DIR$/server" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sql/insert_audit_rules.sql" beforeDir="false" afterPath="$PROJECT_DIR$/sql/insert_audit_rules.sql" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,27 +52,28 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Go Build.go build reimbursement-audit/cmd/api.executor&quot;: &quot;Debug&quot;,
-    &quot;Go Build.go build reimbursement-audit/cmd/migrate.executor&quot;: &quot;Debug&quot;,
-    &quot;Go Build.go build reimbursement-audit/cmd/server.executor&quot;: &quot;Debug&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.modules.go.list.on.any.changes.was.set&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;jiaqiii&quot;,
-    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/lijiaqi&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;onboarding.tips.debug.path&quot;: &quot;/Users/lijiaqi/reimbursement-audit/main.go&quot;,
-    &quot;run.configurations.included.in.services&quot;: &quot;true&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;go&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Go Build.go build reimbursement-audit/cmd/api.executor": "Debug",
+    "Go Build.go build reimbursement-audit/cmd/migrate.executor": "Debug",
+    "Go Build.go build reimbursement-audit/cmd/server.executor": "Debug",
+    "Go Test.reimbursement_workflow_test.go.executor": "Debug",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.go.formatter.settings.were.checked": "true",
+    "RunOnceActivity.go.migrated.go.modules.settings": "true",
+    "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
+    "git-widget-placeholder": "jiaqiii",
+    "go.import.settings.migrated": "true",
+    "last_opened_file_path": "/Users/lijiaqi",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "onboarding.tips.debug.path": "/Users/lijiaqi/reimbursement-audit/main.go",
+    "run.configurations.included.in.services": "true",
+    "settings.editor.selected.configurable": "go"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/test/unit/handler" />
@@ -83,7 +86,7 @@
       </set>
     </option>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Go Build.go build reimbursement-audit/cmd/server">
     <configuration name="go build reimbursement-audit/cmd/server" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
       <module name="reimbursement-audit" />
       <working_directory value="$PROJECT_DIR$" />
@@ -93,9 +96,20 @@
       <filePath value="$PROJECT_DIR$/cmd/server/main.go" />
       <method v="2" />
     </configuration>
+    <configuration name="reimbursement_workflow_test.go" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="reimbursement-audit" />
+      <working_directory value="$PROJECT_DIR$/test/integration" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="FILE" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$/test/integration/reimbursement_workflow_test.go" />
+      <framework value="gotest" />
+      <method v="2" />
+    </configuration>
     <recent_temporary>
       <list>
         <item itemvalue="Go Build.go build reimbursement-audit/cmd/server" />
+        <item itemvalue="Go Test.reimbursement_workflow_test.go" />
       </list>
     </recent_temporary>
   </component>
@@ -132,6 +146,11 @@
           <url>file://$PROJECT_DIR$/main.go</url>
           <line>20</line>
           <option name="timeStamp" value="1" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/internal/domain/rag/llm_client.go</url>
+          <line>17</line>
+          <option name="timeStamp" value="9" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

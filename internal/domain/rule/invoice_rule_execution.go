@@ -20,11 +20,94 @@ import (
 
 // InvoiceValidationData 发票校验数据（用于规则引擎）
 type InvoiceValidationData struct {
-	Invoice       *ocr.Invoice                 `json:"invoice"`       // 待校验发票
-	Reimbursement *reimbursement.Reimbursement `json:"reimbursement"` // 关联报销单
-	CompanyNames  []string                     `json:"company_names"` // 允许的公司名称列表
-	InvoiceTypes  []string                     `json:"invoice_types"` // 允许的发票类型列表
-	ApplyDate     time.Time                    `json:"apply_date"`    // 报销申请日期
+	Invoice                       *ocr.Invoice                 `json:"invoice"`                             // 待校验发票
+	Reimbursement                 *reimbursement.Reimbursement `json:"reimbursement"`                       // 关联报销单
+	CompanyNames                  []string                     `json:"company_names"`                       // 允许的公司名称列表
+	InvoiceTypes                  []string                     `json:"invoice_types"`                       // 允许的发票类型列表
+	ApplyDate                     time.Time                    `json:"apply_date"`                          // 报销申请日期
+	IsInvoiceDateOlderThan6Months bool                         `json:"is_invoice_date_older_than_6_months"` // 发票日期是否超过6个月
+}
+
+// RuleHelperContext 规则引擎辅助函数上下文
+type RuleHelperContext struct {
+	validator *InvoiceValidatorImpl
+	ctx       context.Context
+}
+
+// IsInvoiceDateOlderThanMonths 检查发票日期是否超过指定月份（独立函数）
+func IsInvoiceDateOlderThanMonths(helperCtx *RuleHelperContext, invoiceDate *time.Time, applyDate time.Time, months int) bool {
+	if invoiceDate == nil {
+		if helperCtx != nil && helperCtx.validator != nil {
+			helperCtx.validator.logger.WithContext(helperCtx.ctx).Debug("IsInvoiceDateOlderThanMonths: invoiceDate is nil")
+		}
+		return false
+	}
+	result := applyDate.After(invoiceDate.AddDate(0, months, 0))
+	if helperCtx != nil && helperCtx.validator != nil {
+		helperCtx.validator.logger.WithContext(helperCtx.ctx).Debug("IsInvoiceDateOlderThanMonths",
+			logger.NewField("invoiceDate", invoiceDate),
+			logger.NewField("applyDate", applyDate),
+			logger.NewField("months", months),
+			logger.NewField("result", result))
+	}
+	return result
+}
+
+// RuleHelperFunctions 规则引擎辅助函数集合（已废弃，保留用于兼容）
+type RuleHelperFunctions struct {
+	validator *InvoiceValidatorImpl
+	ctx       context.Context
+}
+
+// IsDuplicateInvoice 检查发票是否重复
+func (h *RuleHelperFunctions) IsDuplicateInvoice(invoiceCode, invoiceNumber string) bool {
+	result, _ := h.validator.isDuplicateInvoice(h.ctx, invoiceCode, invoiceNumber)
+	return result
+}
+
+// IsInvoiceDateOlderThanMonths 检查发票日期是否超过指定月份
+func (h *RuleHelperFunctions) IsInvoiceDateOlderThanMonths(invoiceDate *time.Time, applyDate time.Time, months int) bool {
+	return IsInvoiceDateOlderThanMonths(&RuleHelperContext{validator: h.validator, ctx: h.ctx}, invoiceDate, applyDate, months)
+}
+
+// GetAccommodationLimit 获取住宿费限额
+func (h *RuleHelperFunctions) GetAccommodationLimit(cityLevel string) float64 {
+	return h.validator.getAccommodationLimit(h.ctx, cityLevel)
+}
+
+// GetEntertainmentLimit 获取招待费限额
+func (h *RuleHelperFunctions) GetEntertainmentLimit(level string) float64 {
+	return h.validator.getEntertainmentLimit(h.ctx, level)
+}
+
+// IsConsecutiveInvoice 检查发票号码是否连续
+func (h *RuleHelperFunctions) IsConsecutiveInvoice(invoiceNumbers []string) bool {
+	result, _ := h.validator.isConsecutiveInvoice(h.ctx, invoiceNumbers)
+	return result
+}
+
+// IsWeekendOrHoliday 检查日期是否为周末或节假日
+func (h *RuleHelperFunctions) IsWeekendOrHoliday(date time.Time) bool {
+	result, _ := h.validator.isWeekendOrHoliday(h.ctx, date)
+	return result
+}
+
+// IsValidTaxNumber 检查税号是否有效
+func (h *RuleHelperFunctions) IsValidTaxNumber(taxNumber string) bool {
+	result, _ := h.validator.isValidTaxNumber(h.ctx, taxNumber)
+	return result
+}
+
+// HasOrderAndReceipt 检查是否有订单和收据
+func (h *RuleHelperFunctions) HasOrderAndReceipt(invoiceID string) bool {
+	result, _ := h.validator.hasOrderAndReceipt(h.ctx, invoiceID)
+	return result
+}
+
+// IsThreeDocumentMatching 检查三单是否匹配
+func (h *RuleHelperFunctions) IsThreeDocumentMatching(invoiceID string) bool {
+	result, _ := h.validator.isThreeDocumentMatching(h.ctx, invoiceID)
+	return result
 }
 
 // executeRulesWithPriority 按优先级执行规则
@@ -57,42 +140,45 @@ func (v *InvoiceValidatorImpl) executeRulesWithPriority(ctx context.Context, req
 		Message:    "",
 	}
 
+	// 创建辅助函数上下文
+	helperCtx := &RuleHelperContext{
+		validator: v,
+		ctx:       ctx,
+	}
+
 	// 将校验结果添加到数据上下文中
 	dataContext := map[string]interface{}{
-		"data":   validationData,
-		"result": validationResult,
-		// 添加辅助函数 - 适配为Grule可用的函数
-		"IsDuplicateInvoice": func(invoiceCode, invoiceNumber string) bool {
-			result, _ := v.isDuplicateInvoice(ctx, invoiceCode, invoiceNumber)
-			return result
-		},
-		"GetAccommodationLimit": func(cityLevel string) float64 {
-			return v.getAccommodationLimit(ctx, cityLevel)
-		},
-		"GetEntertainmentLimit": func(level string) float64 {
-			return v.getEntertainmentLimit(ctx, level)
-		},
-		"IsConsecutiveInvoice": func(invoiceNumbers []string) bool {
-			result, _ := v.isConsecutiveInvoice(ctx, invoiceNumbers)
-			return result
-		},
-		"IsWeekendOrHoliday": func(date time.Time) bool {
-			result, _ := v.isWeekendOrHoliday(ctx, date)
-			return result
-		},
-		"IsValidTaxNumber": func(taxNumber string) bool {
-			result, _ := v.isValidTaxNumber(ctx, taxNumber)
-			return result
-		},
-		"HasOrderAndReceipt": func(invoiceID string) bool {
-			result, _ := v.hasOrderAndReceipt(ctx, invoiceID)
-			return result
-		},
-		"IsThreeDocumentMatching": func(invoiceID string) bool {
-			result, _ := v.isThreeDocumentMatching(ctx, invoiceID)
-			return result
+		"data":      validationData,
+		"result":    validationResult,
+		"helperCtx": helperCtx,
+		"IsInvoiceDateOlderThanMonths": func(invoiceDate *time.Time, applyDate time.Time, months int) bool {
+			return IsInvoiceDateOlderThanMonths(helperCtx, invoiceDate, applyDate, months)
 		},
 	}
+
+	// 添加扁平化的日期字段到上下文，方便规则引擎访问
+	if validationData.Invoice != nil {
+		dataContext["InvoiceDate"] = validationData.Invoice.Date
+		dataContext["InvoiceAmount"] = validationData.Invoice.Amount
+		dataContext["InvoiceType"] = validationData.Invoice.Type
+		// 添加解引用后的日期值
+		if validationData.Invoice.Date != nil {
+			dataContext["InvoiceDateValue"] = *validationData.Invoice.Date
+			v.logger.WithContext(ctx).Debug("添加InvoiceDateValue到DataContext",
+				logger.NewField("InvoiceDateValue", *validationData.Invoice.Date))
+			// 预先计算日期比较结果并设置到validationData
+			datePlus6Months := validationData.Invoice.Date.AddDate(0, 6, 0)
+			validationData.IsInvoiceDateOlderThan6Months = time.Now().After(datePlus6Months)
+			v.logger.WithContext(ctx).Debug("预先计算日期比较结果",
+				logger.NewField("InvoiceDate", *validationData.Invoice.Date),
+				logger.NewField("InvoiceDate+6个月", datePlus6Months),
+				logger.NewField("当前时间", time.Now()),
+				logger.NewField("IsInvoiceDateOlderThan6Months", validationData.IsInvoiceDateOlderThan6Months))
+		} else {
+			v.logger.WithContext(ctx).Warn("Invoice.Date为nil，无法添加InvoiceDateValue")
+		}
+	}
+	dataContext["ApplyDate"] = validationData.ApplyDate
 
 	// 执行规则并收集结果
 	for _, rule := range allRules {
@@ -100,10 +186,17 @@ func (v *InvoiceValidatorImpl) executeRulesWithPriority(ctx context.Context, req
 			continue // 跳过禁用的规则
 		}
 
-		v.logger.WithContext(ctx).Debug("执行规则",
+		v.logger.WithContext(ctx).Info("执行规则",
 			logger.NewField("规则ID", rule.ID),
 			logger.NewField("规则名称", rule.Name),
 			logger.NewField("优先级", rule.Priority))
+
+		// 打印数据上下文信息
+		v.logger.WithContext(ctx).Debug("数据上下文信息",
+			logger.NewField("Invoice.ID", validationData.Invoice.ID),
+			logger.NewField("Invoice.Date", validationData.Invoice.Date),
+			logger.NewField("ApplyDate", validationData.ApplyDate),
+			logger.NewField("result.Passed", validationResult.Passed))
 
 		// 执行规则
 		ruleResult, err := v.ruleEngine.ExecuteRuleWithDataContext(ctx, rule.ID, dataContext)
@@ -114,6 +207,12 @@ func (v *InvoiceValidatorImpl) executeRulesWithPriority(ctx context.Context, req
 				logger.NewField("error", err.Error()))
 			continue
 		}
+
+		v.logger.WithContext(ctx).Info("规则执行结果",
+			logger.NewField("规则ID", rule.ID),
+			logger.NewField("规则名称", rule.Name),
+			logger.NewField("Passed", ruleResult.Passed),
+			logger.NewField("Message", ruleResult.Message))
 
 		// 如果规则未通过，更新结果
 		if !ruleResult.Passed {

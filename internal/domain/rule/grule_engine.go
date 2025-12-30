@@ -318,15 +318,13 @@ func (e *GRuleEngine) ExecuteRuleWithDataContext(ctx context.Context, ruleID str
 		}
 	}
 
-	// 创建结果对象
+	// 创建结果对象（每次执行规则都创建新的，避免共享状态）
 	result := &RuleValidationResult{
 		RuleID:    ruleID,
 		Passed:    true,
 		Message:   "规则执行初始化",
 		Timestamp: time.Now(),
 	}
-
-	// 添加结果对象到上下文
 	err := dc.Add("result", result)
 	if err != nil {
 		e.logger.WithContext(ctx).Error("添加结果对象到上下文失败",
@@ -338,9 +336,56 @@ func (e *GRuleEngine) ExecuteRuleWithDataContext(ctx context.Context, ruleID str
 	// 创建引擎实例
 	gruleEngine := engine.NewGruleEngine()
 
-	// 执行规则
+	// 记录关键数据值用于调试
+	e.logger.WithContext(ctx).Info("规则执行前 - data类型",
+		logger.NewField("规则ID", ruleID),
+		logger.NewField("data类型", fmt.Sprintf("%T", dataContext["data"])))
+
+	// 记录扁平化的字段值
+	if invoiceDate, ok := dataContext["InvoiceDate"]; ok {
+		e.logger.WithContext(ctx).Info("规则执行前 - InvoiceDate",
+			logger.NewField("规则ID", ruleID),
+			logger.NewField("InvoiceDate类型", fmt.Sprintf("%T", invoiceDate)),
+			logger.NewField("InvoiceDate值", fmt.Sprintf("%v", invoiceDate)))
+	}
+	if invoiceDateValue, ok := dataContext["InvoiceDateValue"]; ok {
+		e.logger.WithContext(ctx).Info("规则执行前 - InvoiceDateValue",
+			logger.NewField("规则ID", ruleID),
+			logger.NewField("InvoiceDateValue类型", fmt.Sprintf("%T", invoiceDateValue)),
+			logger.NewField("InvoiceDateValue值", fmt.Sprintf("%v", invoiceDateValue)))
+	}
+	if applyDate, ok := dataContext["ApplyDate"]; ok {
+		e.logger.WithContext(ctx).Info("规则执行前 - ApplyDate",
+			logger.NewField("规则ID", ruleID),
+			logger.NewField("ApplyDate类型", fmt.Sprintf("%T", applyDate)),
+			logger.NewField("ApplyDate值", fmt.Sprintf("%v", applyDate)))
+	}
+	if isOlderThan6Months, ok := dataContext["IsInvoiceDateOlderThan6Months"]; ok {
+		e.logger.WithContext(ctx).Info("规则执行前 - IsInvoiceDateOlderThan6Months",
+			logger.NewField("规则ID", ruleID),
+			logger.NewField("IsInvoiceDateOlderThan6Months类型", fmt.Sprintf("%T", isOlderThan6Months)),
+			logger.NewField("IsInvoiceDateOlderThan6Months值", fmt.Sprintf("%v", isOlderThan6Months)))
+	} else {
+		e.logger.WithContext(ctx).Debug("规则执行前 - IsInvoiceDateOlderThan6Months不在DataContext中（应该通过data对象访问）",
+			logger.NewField("规则ID", ruleID))
+	}
+
+	if data, ok := dataContext["data"]; ok {
+		if validationData, ok := data.(*InvoiceValidationData); ok {
+			e.logger.WithContext(ctx).Info("规则执行前 - data.IsInvoiceDateOlderThan6Months",
+				logger.NewField("规则ID", ruleID),
+				logger.NewField("data.IsInvoiceDateOlderThan6Months值", validationData.IsInvoiceDateOlderThan6Months))
+		}
+	}
+
+	e.logger.WithContext(ctx).Debug("开始执行规则",
+		logger.NewField("规则ID", ruleID),
+		logger.NewField("执行前result.Passed", result.Passed))
 	err = gruleEngine.Execute(dc, knowledgeBase)
 	executionTime := time.Since(startTime)
+	e.logger.WithContext(ctx).Debug("规则执行完成",
+		logger.NewField("规则ID", ruleID),
+		logger.NewField("执行后result.Passed", result.Passed))
 
 	if err != nil {
 		e.logger.WithContext(ctx).Error("规则执行失败",
@@ -358,11 +403,18 @@ func (e *GRuleEngine) ExecuteRuleWithDataContext(ctx context.Context, ruleID str
 
 	// 从上下文中获取结果
 	resultNode := dc.Get("result")
+	e.logger.WithContext(ctx).Debug("从上下文获取结果",
+		logger.NewField("规则ID", ruleID),
+		logger.NewField("resultNode是否为nil", resultNode == nil))
 	if resultNode != nil {
 		// 尝试将结果转换为 RuleValidationResult
 		if resultVal, ok := resultNode.(model.ValueNode); ok {
 			if resultObj, err := resultVal.GetValue(); err == nil {
 				if res, ok := resultObj.Interface().(*RuleValidationResult); ok {
+					e.logger.WithContext(ctx).Debug("从上下文获取到结果对象",
+						logger.NewField("规则ID", ruleID),
+						logger.NewField("上下文result.Passed", res.Passed),
+						logger.NewField("是否为同一对象", res == result))
 					result = res
 				}
 			}

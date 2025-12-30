@@ -148,30 +148,44 @@ func (s *Service) GetAuditByReimbursementID(ctx context.Context, reimbursementID
 func (s *Service) executeRuleValidation(ctx context.Context, reimbursement *reimbursement.Reimbursement) ([]*RuleValidationResult, error) {
 	s.logger.WithContext(ctx).Info("开始规则校验")
 
-	data := s.buildRuleValidationData(reimbursement)
-	results, err := s.ruleService.ValidateAllRules(ctx, data)
-	if err != nil {
-		s.logger.WithContext(ctx).Error("规则校验失败", logger.NewField("error", err))
-		return nil, err
-	}
+	allResults := make([]*RuleValidationResult, 0)
 
-	convertedResults := make([]*RuleValidationResult, len(results))
-	for i, result := range results {
-		convertedResults[i] = &RuleValidationResult{
-			RuleID:        result.RuleID,
-			RuleCode:      result.RuleID,
-			RuleName:      result.RuleName,
-			RuleType:      result.RuleType,
-			Passed:        result.Passed,
-			Message:       result.Message,
-			Details:       map[string]interface{}{"details": result.Details},
-			ExecutionTime: result.ExecutionTime,
+	for _, invoice := range reimbursement.Invoices {
+		s.logger.WithContext(ctx).Debug("开始校验发票",
+			logger.NewField("发票ID", invoice.ID),
+			logger.NewField("发票号码", invoice.Number))
+
+		validationData := &rule.InvoiceValidationData{
+			Invoice:       invoice,
+			Reimbursement: reimbursement,
+			ApplyDate:     reimbursement.ApplyDate,
+		}
+
+		results, err := s.ruleService.ValidateAllRules(ctx, validationData)
+		if err != nil {
+			s.logger.WithContext(ctx).Error("规则校验失败",
+				logger.NewField("发票ID", invoice.ID),
+				logger.NewField("error", err))
+			return nil, err
+		}
+
+		for _, result := range results {
+			allResults = append(allResults, &RuleValidationResult{
+				RuleID:        result.RuleID,
+				RuleCode:      result.RuleID,
+				RuleName:      result.RuleName,
+				RuleType:      result.RuleType,
+				Passed:        result.Passed,
+				Message:       result.Message,
+				Details:       map[string]interface{}{"details": result.Details, "invoice_id": invoice.ID},
+				ExecutionTime: result.ExecutionTime,
+			})
 		}
 	}
 
-	s.logger.WithContext(ctx).Info("规则校验完成", logger.NewField("result_count", len(results)))
+	s.logger.WithContext(ctx).Info("规则校验完成", logger.NewField("result_count", len(allResults)))
 
-	return convertedResults, nil
+	return allResults, nil
 }
 
 // executeRAGAnalysis 执行RAG分析
@@ -210,9 +224,9 @@ func (s *Service) executeRAGAnalysis(ctx context.Context, reimbursementInfo map[
 	return ragResult, nil
 }
 
-// buildReimbursementInfo 构建报销单信息
+// buildReimbursementInfo 构建报销单信息（包含发票详细信息）
 func (s *Service) buildReimbursementInfo(reimbursement *reimbursement.Reimbursement) map[string]interface{} {
-	return map[string]interface{}{
+	info := map[string]interface{}{
 		"id":            reimbursement.ID,
 		"user_id":       reimbursement.UserID,
 		"user_name":     reimbursement.UserName,
@@ -226,9 +240,76 @@ func (s *Service) buildReimbursementInfo(reimbursement *reimbursement.Reimbursem
 		"expense_date":  reimbursement.ExpenseDate,
 		"invoice_count": len(reimbursement.Invoices),
 	}
+
+	if reimbursement.StartDate != nil {
+		info["start_date"] = reimbursement.StartDate
+	}
+	if reimbursement.EndDate != nil {
+		info["end_date"] = reimbursement.EndDate
+	}
+	info["destination"] = reimbursement.Destination
+	info["city"] = reimbursement.City
+	info["province"] = reimbursement.Province
+	info["transportation"] = reimbursement.Transportation
+	info["project_code"] = reimbursement.ProjectCode
+	info["budget_code"] = reimbursement.BudgetCode
+
+	invoices := make([]map[string]interface{}, len(reimbursement.Invoices))
+	for i, invoice := range reimbursement.Invoices {
+		invoices[i] = map[string]interface{}{
+			"id":                  invoice.ID,
+			"type":                invoice.Type,
+			"code":                invoice.Code,
+			"number":              invoice.Number,
+			"date":                invoice.Date,
+			"amount":              invoice.Amount,
+			"tax_amount":          invoice.TaxAmount,
+			"total_amount":        invoice.Amount + invoice.TaxAmount,
+			"buyer_name":          invoice.BuyerName,
+			"buyer_tax_no":        invoice.BuyerTaxNo,
+			"seller_name":         invoice.SellerName,
+			"seller_tax_no":       invoice.SellerTaxNo,
+			"commodity_name":      invoice.CommodityName,
+			"specification":       invoice.Specification,
+			"unit":                invoice.Unit,
+			"quantity":            invoice.Quantity,
+			"price":               invoice.Price,
+			"category":            invoice.Category,
+			"sub_category":        invoice.SubCategory,
+			"expense_type":        invoice.ExpenseType,
+			"merchant_type":       invoice.MerchantType,
+			"merchant_code":       invoice.MerchantCode,
+			"location":            invoice.Location,
+			"city":                invoice.City,
+			"province":            invoice.Province,
+			"country":             invoice.Country,
+			"purpose":             invoice.Purpose,
+			"description":         invoice.Description,
+			"project_code":        invoice.ProjectCode,
+			"department_code":     invoice.DepartmentCode,
+			"cost_center":         invoice.CostCenter,
+			"contract_number":     invoice.ContractNumber,
+			"approval_level":      invoice.ApprovalLevel,
+			"is_reimbursable":     invoice.IsReimbursable,
+			"is_personal":         invoice.IsPersonal,
+			"is_vat":              invoice.IsVAT,
+			"vat_rate":            invoice.VATRate,
+			"exchange_rate":       invoice.ExchangeRate,
+			"original_amount":     invoice.OriginalAmount,
+			"original_currency":   invoice.OriginalCurrency,
+			"is_electronic":       invoice.IsElectronic,
+			"is_duplicate":        invoice.IsDuplicate,
+			"verification_status": invoice.VerificationStatus,
+			"items":               invoice.Items,
+			"total_items":         invoice.TotalItems,
+			"main_commodity":      invoice.MainCommodity,
+		}
+	}
+	info["invoices"] = invoices
+
+	return info
 }
 
-// buildRuleValidationData 构建规则校验数据
 func (s *Service) buildRuleValidationData(reimbursement *reimbursement.Reimbursement) map[string]interface{} {
 	return s.buildReimbursementInfo(reimbursement)
 }

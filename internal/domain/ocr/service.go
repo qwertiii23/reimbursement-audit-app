@@ -8,6 +8,7 @@ package ocr
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -24,17 +25,19 @@ type InvoiceParser interface {
 
 // ParserService OCR解析领域服务
 type ParserService struct {
-	parser InvoiceParser
-	repo   Repository
-	logger logger.Logger
+	parser   InvoiceParser
+	repo     Repository
+	logger   logger.Logger
+	basePath string // 文件存储基础路径
 }
 
 // NewParserService 创建OCR解析服务
-func NewParserService(parser InvoiceParser, repo Repository, logger logger.Logger) *ParserService {
+func NewParserService(parser InvoiceParser, repo Repository, logger logger.Logger, basePath string) *ParserService {
 	return &ParserService{
-		parser: parser,
-		repo:   repo,
-		logger: logger,
+		parser:   parser,
+		repo:     repo,
+		logger:   logger,
+		basePath: basePath,
 	}
 }
 
@@ -53,8 +56,14 @@ func (s *ParserService) ParseInvoiceImage(ctx context.Context, invoiceID string)
 		logger.Field{Key: "invoice_id", Value: invoiceID},
 		logger.Field{Key: "image_path", Value: invoice.ImagePath})
 
+	// 构建完整的文件路径
+	fullPath := invoice.ImagePath
+	if s.basePath != "" {
+		fullPath = s.basePath + "/" + invoice.ImagePath
+	}
+
 	// 调用OCR服务解析发票
-	ocrResult, err := s.parser.ParseInvoice(ctx, invoice.ImagePath)
+	ocrResult, err := s.parser.ParseInvoice(ctx, fullPath)
 	if err != nil {
 		s.logger.WithContext(ctx).Error("OCR解析失败",
 			logger.Field{Key: "error", Value: err.Error()},
@@ -93,7 +102,7 @@ func (s *ParserService) ParseInvoiceImage(ctx context.Context, invoiceID string)
 	}
 
 	// 更新发票信息
-	s.updateInvoiceFromOCR(invoice, ocrResult)
+	s.updateInvoiceFromOCR(ctx, invoice, ocrResult)
 	invoice.Status = "已识别"
 	invoice.UpdatedAt = time.Now()
 
@@ -159,33 +168,237 @@ func (s *ParserService) ParseInvoicesByReimbursementID(ctx context.Context, reim
 }
 
 // updateInvoiceFromOCR 使用OCR结果更新发票信息
-func (s *ParserService) updateInvoiceFromOCR(invoice *Invoice, ocrResult *InvoiceInfo) {
-	// 更新发票基本信息
-	invoice.Code = ocrResult.InvoiceCode
+func (s *ParserService) updateInvoiceFromOCR(ctx context.Context, invoice *Invoice, ocrResult *InvoiceInfo) {
 	invoice.Number = ocrResult.InvoiceNumber
-	invoice.Type = ocrResult.InvoiceType
 
-	// 解析日期字符串为time.Time
+	userType := invoice.Type
+	ocrType := ocrResult.InvoiceType
+
+	if userType == "" {
+		invoice.Type = ocrType
+	}
+
+	if userType != "" && ocrType != "" && userType != ocrType {
+		s.logger.WithContext(ctx).Warn("用户填写的发票类型与OCR识别不一致",
+			logger.Field{Key: "invoice_id", Value: invoice.ID},
+			logger.Field{Key: "user_type", Value: userType},
+			logger.Field{Key: "ocr_type", Value: ocrType})
+
+		if invoice.Remarks != "" {
+			invoice.Remarks += "; "
+		}
+		invoice.Remarks += fmt.Sprintf("用户填写类型:%s, OCR识别类型:%s", userType, ocrType)
+	}
+
 	if ocrResult.InvoiceDate != "" {
 		if parsedDate, err := s.parseDate(ocrResult.InvoiceDate); err == nil {
-			invoice.Date = parsedDate
+			invoice.Date = &parsedDate
 		}
 	}
 
-	// 更新金额信息
 	invoice.Amount = ocrResult.TotalAmount
 	invoice.TaxAmount = ocrResult.TaxAmount
 
-	// 更新购方信息
 	invoice.BuyerName = ocrResult.BuyerName
 	invoice.BuyerTaxNo = ocrResult.BuyerTaxNumber
 
-	// 更新销方信息
 	invoice.SellerName = ocrResult.SellerName
 	invoice.SellerTaxNo = ocrResult.SellerTaxNumber
 
-	// 更新OCR识别结果
 	invoice.OCRResult = ocrResult.RawText
+
+	invoice.VerificationTime = &ocrResult.ParseTime
+
+	if len(ocrResult.Items) > 0 {
+		invoice.TotalItems = len(ocrResult.Items)
+
+		var mainItem *InvoiceItem
+		maxAmount := 0.0
+
+		for i := range ocrResult.Items {
+			item := &ocrResult.Items[i]
+			if item.AmountWithoutTax > maxAmount {
+				maxAmount = item.AmountWithoutTax
+				mainItem = item
+			}
+		}
+
+		if mainItem == nil {
+			mainItem = &ocrResult.Items[0]
+		}
+
+		if mainItem.Name != "" {
+			invoice.CommodityName = mainItem.Name
+			invoice.MainCommodity = mainItem.Name
+		}
+		if mainItem.Specification != "" {
+			invoice.Specification = mainItem.Specification
+		}
+		if mainItem.Unit != "" {
+			invoice.Unit = mainItem.Unit
+		}
+		if mainItem.Quantity > 0 {
+			invoice.Quantity = mainItem.Quantity
+		}
+		if mainItem.UnitPrice > 0 {
+			invoice.Price = mainItem.UnitPrice
+		}
+
+		itemsJSON, err := json.Marshal(ocrResult.Items)
+		if err == nil {
+			invoice.Items = string(itemsJSON)
+			s.logger.WithContext(ctx).Info("存储商品明细",
+				logger.Field{Key: "invoice_id", Value: invoice.ID},
+				logger.Field{Key: "total_items", Value: invoice.TotalItems},
+				logger.Field{Key: "main_commodity", Value: invoice.MainCommodity},
+				logger.Field{Key: "main_item_price", Value: mainItem.UnitPrice})
+		} else {
+			s.logger.WithContext(ctx).Error("序列化商品明细失败",
+				logger.Field{Key: "error", Value: err.Error()},
+				logger.Field{Key: "invoice_id", Value: invoice.ID})
+		}
+	}
+
+	if ocrResult.Remarks != "" {
+		invoice.Remarks = ocrResult.Remarks
+	}
+
+	if ocrResult.IsValid {
+		invoice.Status = "recognized"
+		invoice.VerificationStatus = "verified"
+	} else {
+		invoice.Status = "recognition_failed"
+		invoice.VerificationStatus = "failed"
+		if ocrResult.ErrorMessage != "" {
+			if invoice.Remarks != "" {
+				invoice.Remarks += "; " + ocrResult.ErrorMessage
+			} else {
+				invoice.Remarks = ocrResult.ErrorMessage
+			}
+		}
+	}
+
+	if ocrResult.InvoiceType != "" {
+		invoice.IsVAT = strings.Contains(ocrResult.InvoiceType, "增值税")
+	}
+
+	s.inferExtendedFields(invoice, ocrResult)
+}
+
+// inferExtendedFields 智能推断扩展字段
+func (s *ParserService) inferExtendedFields(invoice *Invoice, ocrResult *InvoiceInfo) {
+	s.inferVATRate(invoice, ocrResult)
+	s.inferInvoiceCategory(invoice, ocrResult)
+	s.inferMerchantType(invoice, ocrResult)
+	s.inferInvoiceDescription(invoice, ocrResult)
+	s.inferIsElectronic(invoice, ocrResult)
+}
+
+// inferVATRate 推断增值税率
+func (s *ParserService) inferVATRate(invoice *Invoice, ocrResult *InvoiceInfo) {
+	if invoice.Amount > 0 && invoice.TaxAmount > 0 {
+		invoice.VATRate = (invoice.TaxAmount / invoice.Amount) * 100
+	}
+}
+
+// inferInvoiceCategory 推断发票类别
+func (s *ParserService) inferInvoiceCategory(invoice *Invoice, ocrResult *InvoiceInfo) {
+	invoiceType := invoice.Category
+	if invoiceType == "" {
+		invoiceType = ocrResult.InvoiceType
+	}
+
+	sellerName := ocrResult.SellerName
+	mainCommodity := invoice.MainCommodity
+
+	switch {
+	case strings.Contains(invoiceType, "住宿") || strings.Contains(sellerName, "酒店") || strings.Contains(sellerName, "宾馆") || strings.Contains(mainCommodity, "住宿"):
+		invoice.Category = "差旅费"
+		invoice.SubCategory = "住宿费"
+	case strings.Contains(invoiceType, "交通") || strings.Contains(sellerName, "航空") || strings.Contains(sellerName, "铁路") || strings.Contains(sellerName, "客运") || strings.Contains(mainCommodity, "机票") || strings.Contains(mainCommodity, "火车票"):
+		invoice.Category = "差旅费"
+		invoice.SubCategory = "交通费"
+	case strings.Contains(invoiceType, "餐饮") || strings.Contains(sellerName, "餐厅") || strings.Contains(sellerName, "饭店") || strings.Contains(sellerName, "美食") || strings.Contains(mainCommodity, "餐饮"):
+		invoice.Category = "招待费"
+		invoice.SubCategory = "餐饮费"
+	case strings.Contains(invoiceType, "办公用品") || strings.Contains(sellerName, "文具") || strings.Contains(sellerName, "办公") || strings.Contains(mainCommodity, "办公用品"):
+		invoice.Category = "办公费"
+		invoice.SubCategory = "办公用品"
+	case strings.Contains(invoiceType, "培训") || strings.Contains(sellerName, "培训") || strings.Contains(sellerName, "教育") || strings.Contains(mainCommodity, "培训"):
+		invoice.Category = "培训费"
+		invoice.SubCategory = "培训费"
+	case strings.Contains(invoiceType, "会议") || strings.Contains(sellerName, "会议") || strings.Contains(mainCommodity, "会议"):
+		invoice.Category = "会议费"
+		invoice.SubCategory = "会议费"
+	case strings.Contains(invoiceType, "通信") || strings.Contains(sellerName, "通信") || strings.Contains(sellerName, "电信") || strings.Contains(mainCommodity, "话费"):
+		invoice.Category = "通信费"
+		invoice.SubCategory = "通信费"
+	case strings.Contains(invoiceType, "租赁") || strings.Contains(sellerName, "租赁") || strings.Contains(mainCommodity, "租赁"):
+		invoice.Category = "租赁费"
+		invoice.SubCategory = "租赁费"
+	case strings.Contains(invoiceType, "服务") || strings.Contains(sellerName, "服务") || strings.Contains(mainCommodity, "服务"):
+		invoice.Category = "服务费"
+		invoice.SubCategory = "服务费"
+	case strings.Contains(invoiceType, "咨询") || strings.Contains(sellerName, "咨询") || strings.Contains(mainCommodity, "咨询"):
+		invoice.Category = "咨询费"
+		invoice.SubCategory = "咨询费"
+	default:
+		invoice.Category = "其他费用"
+		invoice.SubCategory = "其他"
+	}
+}
+
+// inferMerchantType 推断商户类型
+func (s *ParserService) inferMerchantType(invoice *Invoice, ocrResult *InvoiceInfo) {
+	sellerName := ocrResult.SellerName
+
+	switch {
+	case strings.Contains(sellerName, "酒店") || strings.Contains(sellerName, "宾馆") || strings.Contains(sellerName, "旅馆"):
+		invoice.MerchantType = "酒店"
+	case strings.Contains(sellerName, "餐厅") || strings.Contains(sellerName, "饭店") || strings.Contains(sellerName, "美食"):
+		invoice.MerchantType = "餐厅"
+	case strings.Contains(sellerName, "航空") || strings.Contains(sellerName, "机场"):
+		invoice.MerchantType = "航空公司"
+	case strings.Contains(sellerName, "铁路") || strings.Contains(sellerName, "高铁"):
+		invoice.MerchantType = "铁路公司"
+	case strings.Contains(sellerName, "超市") || strings.Contains(sellerName, "商场"):
+		invoice.MerchantType = "超市"
+	case strings.Contains(sellerName, "加油站") || strings.Contains(sellerName, "石油"):
+		invoice.MerchantType = "加油站"
+	case strings.Contains(sellerName, "医院") || strings.Contains(sellerName, "诊所"):
+		invoice.MerchantType = "医疗机构"
+	case strings.Contains(sellerName, "银行"):
+		invoice.MerchantType = "银行"
+	}
+}
+
+// inferInvoiceDescription 推断发票描述
+func (s *ParserService) inferInvoiceDescription(invoice *Invoice, ocrResult *InvoiceInfo) {
+	var descParts []string
+
+	if ocrResult.InvoiceName != "" {
+		descParts = append(descParts, ocrResult.InvoiceName)
+	}
+
+	if ocrResult.SellerName != "" {
+		descParts = append(descParts, "销售方: "+ocrResult.SellerName)
+	}
+
+	if ocrResult.InvoiceType != "" {
+		descParts = append(descParts, "类型: "+ocrResult.InvoiceType)
+	}
+
+	if invoice.Amount > 0 {
+		descParts = append(descParts, fmt.Sprintf("金额: %.2f", invoice.Amount))
+	}
+
+	invoice.Description = strings.Join(descParts, "; ")
+}
+
+// inferIsElectronic 推断是否为电子发票
+func (s *ParserService) inferIsElectronic(invoice *Invoice, ocrResult *InvoiceInfo) {
+	invoiceType := ocrResult.InvoiceType
+	invoice.IsElectronic = strings.Contains(invoiceType, "电子") || strings.Contains(invoiceType, "数电")
 }
 
 // parseDate 解析日期字符串为time.Time
@@ -218,6 +431,7 @@ func (s *ParserService) parseDate(dateStr string) (time.Time, error) {
 		"2006-01-02",
 		"2006/01/02",
 		"2006.01.02",
+		"2006年01月02日",
 	}
 
 	for _, format := range formats {

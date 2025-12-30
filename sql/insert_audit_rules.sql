@@ -1,623 +1,408 @@
 -- 报销规则初始化数据
--- 基于企业常见报销政策和标准
+-- 基于实际发票字段设计的实用规则
 
--- 差旅费报销规则
-
--- 不要这么做 我不是有一个create接口吗 到时候调用接口再这么写 因为rule_code需要自动生成
-
--- 1. 住宿费报销规则 - 一线城市
-INSERT INTO audit_rules (
+-- 1. 发票时效性规则 - 开票日期必须在半年内
+INSERT INTO rules (
     id, 
     rule_code, 
-    rule_name, 
-    rule_content, 
+    name, 
+    definition, 
     priority, 
     category, 
     status, 
     description,
+    type,
+    enabled,
     created_by,
     created_at,
     updated_at
 ) VALUES (
     UUID(),
-    'RULE_ACCOMMODATION_TIER1',
-    '一线城市住宿费上限600元',
-    'rule accommodation_limit_tier1 "一线城市住宿费上限检查" salience 10 {
+    'RULE_INVOICE_DATE_VALID',
+    '发票开票日期必须在半年内',
+    'rule invoice_date_valid "发票开票日期时效性检查" salience 100 {
     when
-        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "住宿费" && data.Invoice.City in ("北京", "上海", "广州", "深圳") && data.Invoice.Amount > 600.0
+        data.Invoice.Date != nil && data.ApplyDate.Sub(*data.Invoice.Date) > 4320h
     then
         result.Passed = false;
-        result.Message = "一线城市住宿费超过600元上限";
-        result.Severity = "medium";
-        ret.AddViolation("一线城市住宿费超过600元上限", "medium", 10);
-    }',
-    10,
-    '差旅费',
-    'enabled',
-    '一线城市（北京、上海、广州、深圳）住宿费每晚不得超过600元，超出部分需特殊审批',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 2. 住宿费报销规则 - 二线城市
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_ACCOMMODATION_TIER2',
-    '二线城市住宿费上限400元',
-    'rule accommodation_limit_tier2 "二线城市住宿费上限检查" salience 10 {
-    when
-        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "住宿费" && isSecondTierCity(data.Invoice.City) && data.Invoice.Amount > 400.0
-    then
-        result.Passed = false;
-        result.Message = "二线城市住宿费超过400元上限";
-        result.Severity = "medium";
-        ret.AddViolation("二线城市住宿费超过400元上限", "medium", 10);
-    }',
-    10,
-    '差旅费',
-    'enabled',
-    '二线城市住宿费每晚不得超过400元，超出部分需特殊审批',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 3. 住宿费报销规则 - 三线城市
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_ACCOMMODATION_TIER3',
-    '三线城市住宿费上限300元',
-    'rule accommodation_limit_tier3 "三线城市住宿费上限检查" salience 10 {
-    when
-        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "住宿费" && isThirdTierCity(data.Invoice.City) && data.Invoice.Amount > 300.0
-    then
-        result.Passed = false;
-        result.Message = "三线城市住宿费超过300元上限";
-        result.Severity = "medium";
-        ret.AddViolation("三线城市住宿费超过300元上限", "medium", 10);
-    }',
-    10,
-    '差旅费',
-    'enabled',
-    '三线城市住宿费每晚不得超过300元，超出部分需特殊审批',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 4. 餐饮费报销规则 - 高级管理人员
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_MEAL_EXECUTIVE',
-    '高级管理人员餐饮费上限200元/天',
-    'rule meal_limit_executive "高级管理人员餐饮费上限检查" salience 9 {
-    when
-        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "餐饮费" && data.Reimbursement.ApplicantLevel == "高管" && data.Invoice.Amount > 200.0
-    then
-        result.Passed = false;
-        result.Message = "高级管理人员餐饮费超过200元/天上限";
-        result.Severity = "medium";
-        ret.AddViolation("高级管理人员餐饮费超过200元/天上限", "medium", 9);
-    }',
-    9,
-    '差旅费',
-    'enabled',
-    '高级管理人员出差期间餐饮费每天不得超过200元',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 5. 餐饮费报销规则 - 普通员工
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_MEAL_STAFF',
-    '普通员工餐饮费上限100元/天',
-    'rule meal_limit_staff "普通员工餐饮费上限检查" salience 9 {
-    when
-        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "餐饮费" && data.Reimbursement.ApplicantLevel == "员工" && data.Invoice.Amount > 100.0
-    then
-        result.Passed = false;
-        result.Message = "普通员工餐饮费超过100元/天上限";
-        result.Severity = "medium";
-        ret.AddViolation("普通员工餐饮费超过100元/天上限", "medium", 9);
-    }',
-    9,
-    '差旅费',
-    'enabled',
-    '普通员工出差期间餐饮费每天不得超过100元',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 6. 交通费报销规则 - 飞机舱位限制
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_FLIGHT_CLASS',
-    '飞机票仅限经济舱',
-    'rule flight_class_limit "飞机舱位限制检查" salience 8 {
-    when
-        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "交通费" && data.Invoice.MerchantType == "航空公司" && !isEconomyClass(data.Invoice.Description)
-    then
-        result.Passed = false;
-        result.Message = "飞机票仅限经济舱，商务舱和头等舱需特殊审批";
+        result.Message = "发票开票日期超过半年，无法报销";
         result.Severity = "high";
-        ret.AddViolation("飞机票仅限经济舱，商务舱和头等舱需特殊审批", "high", 8);
+        result.Priority = 100;
     }',
-    8,
-    '差旅费',
+    100,
+    '时效性校验',
     'enabled',
-    '除高管外，所有员工乘坐飞机仅限经济舱，商务舱和头等舱需特殊审批',
+    '发票开票日期必须在半年（180天）内，超过期限无法报销',
+    'invoice_validation',
+    1,
     'system',
     NOW(),
     NOW()
 );
 
--- 7. 交通费报销规则 - 高铁座位限制
-INSERT INTO audit_rules (
+-- 2. 发票金额必须大于0
+INSERT INTO rules (
     id, 
     rule_code, 
-    rule_name, 
-    rule_content, 
+    name, 
+    definition, 
     priority, 
     category, 
     status, 
     description,
+    type,
+    enabled,
     created_by,
     created_at,
     updated_at
 ) VALUES (
     UUID(),
-    'RULE_TRAIN_CLASS',
-    '高铁仅限二等座',
-    'rule train_class_limit "高铁座位限制检查" salience 8 {
+    'RULE_INVOICE_AMOUNT_POSITIVE',
+    '发票金额必须大于0',
+    'rule invoice_amount_positive "发票金额检查" salience 99 {
     when
-        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "交通费" && data.Invoice.MerchantType == "铁路公司" && !isSecondClass(data.Invoice.Description)
+        data.Invoice.Amount <= 0
     then
         result.Passed = false;
-        result.Message = "高铁仅限二等座，一等座和商务座需特殊审批";
+        result.Message = "发票金额必须大于0";
+        result.Severity = "high";
+        result.Priority = 99;
+    }',
+    99,
+    '金额校验',
+    'enabled',
+    '发票金额必须大于0',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 3. 发票号码不能为空
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_INVOICE_NUMBER_REQUIRED',
+    '发票号码不能为空',
+    'rule invoice_number_required "发票号码检查" salience 98 {
+    when
+        data.Invoice.Number == ""
+    then
+        result.Passed = false;
+        result.Message = "发票号码不能为空";
+        result.Severity = "high";
+        result.Priority = 98;
+    }',
+    98,
+    '基础校验',
+    'enabled',
+    '发票号码为必填字段',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 4. 发票类型不能为空
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_INVOICE_TYPE_REQUIRED',
+    '发票类型不能为空',
+    'rule invoice_type_required "发票类型检查" salience 97 {
+    when
+        data.Invoice.Type == ""
+    then
+        result.Passed = false;
+        result.Message = "发票类型不能为空";
+        result.Severity = "high";
+        result.Priority = 97;
+    }',
+    97,
+    '基础校验',
+    'enabled',
+    '发票类型为必填字段',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 5. 住宿费单次限额200元
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_ACCOMMODATION_LIMIT',
+    '住宿费单次限额200元',
+    'rule accommodation_limit "住宿费限额检查" salience 90 {
+    when
+        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "住宿费" && data.Invoice.Amount > 200.0
+    then
+        result.Passed = false;
+        result.Message = "住宿费超过200元上限";
         result.Severity = "medium";
-        ret.AddViolation("高铁仅限二等座，一等座和商务座需特殊审批", "medium", 8);
+        result.Priority = 90;
     }',
-    8,
-    '差旅费',
+    90,
+    '金额校验',
     'enabled',
-    '除高管外，所有员工乘坐高铁仅限二等座，一等座和商务座需特殊审批',
+    '住宿费单次不得超过200元，超出部分需特殊审批',
+    'invoice_validation',
+    1,
     'system',
     NOW(),
     NOW()
 );
 
--- 发票基本规则
-
--- 8. 发票时效性规则 - 普通发票
-INSERT INTO audit_rules (
+-- 6. 餐饮费单次限额100元
+INSERT INTO rules (
     id, 
     rule_code, 
-    rule_name, 
-    rule_content, 
+    name, 
+    definition, 
     priority, 
     category, 
     status, 
     description,
+    type,
+    enabled,
     created_by,
     created_at,
     updated_at
 ) VALUES (
     UUID(),
-    'RULE_INVOICE_TIMELINESS_COMMON',
-    '普通发票6个月内有效',
-    'rule invoice_timeliness_common "普通发票时效性检查" salience 20 {
+    'RULE_MEAL_LIMIT',
+    '餐饮费单次限额100元',
+    'rule meal_limit "餐饮费限额检查" salience 89 {
     when
-        data.Invoice.IsVAT == false && daysBetween(data.Invoice.Date, data.Reimbursement.ApplyDate) > 180
+        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "餐饮费" && data.Invoice.Amount > 100.0
     then
         result.Passed = false;
-        result.Message = "普通发票开具日期超过6个月，无法报销";
-        result.Severity = "high";
-        ret.AddViolation("普通发票开具日期超过6个月，无法报销", "high", 20);
-    }',
-    20,
-    '发票校验',
-    'enabled',
-    '普通发票必须在开具日期后6个月内提交报销，超过期限无法报销',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 9. 发票时效性规则 - 增值税专用发票
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_INVOICE_TIMELINESS_VAT',
-    '增值税专用发票180天内有效',
-    'rule invoice_timeliness_vat "增值税专用发票时效性检查" salience 20 {
-    when
-        data.Invoice.IsVAT == true && daysBetween(data.Invoice.Date, data.Reimbursement.ApplyDate) > 180
-    then
-        result.Passed = false;
-        result.Message = "增值税专用发票开具日期超过180天，无法认证抵扣";
-        result.Severity = "high";
-        ret.AddViolation("增值税专用发票开具日期超过180天，无法认证抵扣", "high", 20);
-    }',
-    20,
-    '发票校验',
-    'enabled',
-    '增值税专用发票必须在开具日期后180天内提交报销，超过期限无法认证抵扣',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 10. 发票金额规则 - 整数金额检查
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_INVOICE_ROUND_AMOUNT',
-    '整数金额发票需特别审核',
-    'rule invoice_round_amount "整数金额发票检查" salience 5 {
-    when
-        data.Invoice.Amount == Math.round(data.Invoice.Amount) && data.Invoice.Amount > 1000.0
-    then
-        result.Passed = true;
-        result.Message = "整数金额发票需特别审核";
-        result.Severity = "low";
-        ret.AddViolation("整数金额发票需特别审核", "low", 5);
-    }',
-    5,
-    '发票校验',
-    'enabled',
-    '金额为整数的发票（特别是大额发票）需要特别审核，防止虚开发票',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 11. 发票重复报销检查
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_DUPLICATE_INVOICE',
-    '发票重复报销检查',
-    'rule duplicate_invoice_check "发票重复报销检查" salience 30 {
-    when
-        data.Invoice.IsDuplicate == true || isDuplicateInvoice(data.Invoice.Code, data.Invoice.Number)
-    then
-        result.Passed = false;
-        result.Message = "发票已报销，不能重复提交";
-        result.Severity = "high";
-        ret.AddViolation("发票已报销，不能重复提交", "high", 30);
-    }',
-    30,
-    '发票校验',
-    'enabled',
-    '检查发票是否已经报销过，防止重复报销',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 招待费报销规则
-
--- 12. 招待费总额限制
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_ENTERTAINMENT_MONTHLY_LIMIT',
-    '招待费月度总额限制',
-    'rule entertainment_monthly_limit "招待费月度总额限制检查" salience 7 {
-    when
-        data.Invoice.Category == "招待费" && getMonthlyEntertainmentTotal(data.Reimbursement.UserID, data.Reimbursement.ApplyDate) > 2000.0
-    then
-        result.Passed = false;
-        result.Message = "招待费月度总额超过2000元上限";
+        result.Message = "餐饮费超过100元上限";
         result.Severity = "medium";
-        ret.AddViolation("招待费月度总额超过2000元上限", "medium", 7);
+        result.Priority = 89;
     }',
-    7,
-    '招待费',
+    89,
+    '金额校验',
     'enabled',
-    '员工每月招待费总额不得超过2000元，超出部分需特殊审批',
+    '餐饮费单次不得超过100元，超出部分需特殊审批',
+    'invoice_validation',
+    1,
     'system',
     NOW(),
     NOW()
 );
 
--- 13. 招待费单次限额
-INSERT INTO audit_rules (
+-- 7. 交通费单次限额500元
+INSERT INTO rules (
     id, 
     rule_code, 
-    rule_name, 
-    rule_content, 
+    name, 
+    definition, 
     priority, 
     category, 
     status, 
     description,
+    type,
+    enabled,
     created_by,
     created_at,
     updated_at
 ) VALUES (
     UUID(),
-    'RULE_ENTERTAINMENT_SINGLE_LIMIT',
+    'RULE_TRANSPORT_LIMIT',
+    '交通费单次限额500元',
+    'rule transport_limit "交通费限额检查" salience 88 {
+    when
+        data.Invoice.Category == "差旅费" && data.Invoice.SubCategory == "交通费" && data.Invoice.Amount > 500.0
+    then
+        result.Passed = false;
+        result.Message = "交通费超过500元上限";
+        result.Severity = "medium";
+        result.Priority = 88;
+    }',
+    88,
+    '金额校验',
+    'enabled',
+    '交通费单次不得超过500元，超出部分需特殊审批',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 8. 招待费单次限额500元
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_ENTERTAINMENT_LIMIT',
     '招待费单次限额500元',
-    'rule entertainment_single_limit "招待费单次限额检查" salience 7 {
+    'rule entertainment_limit "招待费限额检查" salience 87 {
     when
         data.Invoice.Category == "招待费" && data.Invoice.Amount > 500.0
     then
         result.Passed = false;
-        result.Message = "招待费单次超过500元上限";
+        result.Message = "招待费超过500元上限";
         result.Severity = "medium";
-        ret.AddViolation("招待费单次超过500元上限", "medium", 7);
+        result.Priority = 87;
     }',
-    7,
-    '招待费',
+    87,
+    '金额校验',
     'enabled',
-    '单次招待费不得超过500元，超出部分需特殊审批',
+    '招待费单次不得超过500元，超出部分需特殊审批',
+    'invoice_validation',
+    1,
     'system',
     NOW(),
     NOW()
 );
 
--- 办公费报销规则
-
--- 14. 办公用品单次限额
-INSERT INTO audit_rules (
+-- 9. 办公费单次限额1000元
+INSERT INTO rules (
     id, 
     rule_code, 
-    rule_name, 
-    rule_content, 
+    name, 
+    definition, 
     priority, 
     category, 
     status, 
     description,
+    type,
+    enabled,
     created_by,
     created_at,
     updated_at
 ) VALUES (
     UUID(),
-    'RULE_OFFICE_SINGLE_LIMIT',
-    '办公用品单次限额1000元',
-    'rule office_single_limit "办公用品单次限额检查" salience 6 {
+    'RULE_OFFICE_LIMIT',
+    '办公费单次限额1000元',
+    'rule office_limit "办公费限额检查" salience 86 {
     when
-        data.Invoice.Category == "办公费" && data.Invoice.SubCategory == "办公用品" && data.Invoice.Amount > 1000.0
+        data.Invoice.Category == "办公费" && data.Invoice.Amount > 1000.0
     then
         result.Passed = false;
-        result.Message = "办公用品单次采购超过1000元上限";
+        result.Message = "办公费超过1000元上限";
         result.Severity = "medium";
-        ret.AddViolation("办公用品单次采购超过1000元上限", "medium", 6);
+        result.Priority = 86;
     }',
-    6,
-    '办公费',
+    86,
+    '金额校验',
     'enabled',
-    '办公用品单次采购不得超过1000元，超出部分需特殊审批',
+    '办公费单次不得超过1000元，超出部分需特殊审批',
+    'invoice_validation',
+    1,
     'system',
     NOW(),
     NOW()
 );
 
--- 15. 办公费月度限额
-INSERT INTO audit_rules (
+-- 10. 通讯费单次限额200元
+INSERT INTO rules (
     id, 
     rule_code, 
-    rule_name, 
-    rule_content, 
+    name, 
+    definition, 
     priority, 
     category, 
     status, 
     description,
+    type,
+    enabled,
     created_by,
     created_at,
     updated_at
 ) VALUES (
     UUID(),
-    'RULE_OFFICE_MONTHLY_LIMIT',
-    '办公费月度限额3000元',
-    'rule office_monthly_limit "办公费月度限额检查" salience 6 {
+    'RULE_COMMUNICATION_LIMIT',
+    '通讯费单次限额200元',
+    'rule communication_limit "通讯费限额检查" salience 85 {
     when
-        data.Invoice.Category == "办公费" && data.Invoice.SubCategory == "办公用品" && getMonthlyOfficeTotal(data.Reimbursement.UserID, data.Reimbursement.ApplyDate) > 3000.0
+        data.Invoice.Category == "通讯费" && data.Invoice.Amount > 200.0
     then
         result.Passed = false;
-        result.Message = "办公费月度总额超过3000元上限";
+        result.Message = "通讯费超过200元上限";
         result.Severity = "medium";
-        ret.AddViolation("办公费月度总额超过3000元上限", "medium", 6);
+        result.Priority = 85;
     }',
-    6,
-    '办公费',
+    85,
+    '金额校验',
     'enabled',
-    '员工每月办公费总额不得超过3000元，超出部分需特殊审批',
+    '通讯费单次不得超过200元，超出部分需特殊审批',
+    'invoice_validation',
+    1,
     'system',
     NOW(),
     NOW()
 );
 
--- 通讯费报销规则
-
--- 16. 通讯费月度限额
-INSERT INTO audit_rules (
+-- 11. 大额消费检查 - 超过5000元需特别审批
+INSERT INTO rules (
     id, 
     rule_code, 
-    rule_name, 
-    rule_content, 
+    name, 
+    definition, 
     priority, 
     category, 
     status, 
     description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_COMMUNICATION_MONTHLY_LIMIT',
-    '通讯费月度限额200元',
-    'rule communication_monthly_limit "通讯费月度限额检查" salience 6 {
-    when
-        data.Invoice.Category == "通讯费" && getMonthlyCommunicationTotal(data.Reimbursement.UserID, data.Reimbursement.ApplyDate) > 200.0
-    then
-        result.Passed = false;
-        result.Message = "通讯费月度总额超过200元上限";
-        result.Severity = "medium";
-        ret.AddViolation("通讯费月度总额超过200元上限", "medium", 6);
-    }',
-    6,
-    '通讯费',
-    'enabled',
-    '员工每月通讯费总额不得超过200元，超出部分需特殊审批',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 17. 周末消费规则
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_WEEKEND_CONSUMPTION',
-    '周末消费需特别说明',
-    'rule weekend_consumption "周末消费检查" salience 4 {
-    when
-        isWeekend(data.Invoice.Date) && !isBusinessTravel(data.Reimbursement.UserID, data.Invoice.Date)
-    then
-        result.Passed = true;
-        result.Message = "周末消费需提供特别说明";
-        result.Severity = "low";
-        ret.AddViolation("周末消费需提供特别说明", "low", 4);
-    }',
-    4,
-    '所有类目',
-    'enabled',
-    '周末发生的消费（除非出差期间）需要提供特别说明',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 18. 大额消费规则
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
+    type,
+    enabled,
     created_by,
     created_at,
     updated_at
@@ -625,89 +410,372 @@ INSERT INTO audit_rules (
     UUID(),
     'RULE_LARGE_AMOUNT',
     '大额消费需特别审批',
-    'rule large_amount "大额消费检查" salience 15 {
+    'rule large_amount "大额消费检查" salience 80 {
     when
         data.Invoice.Amount > 5000.0
     then
         result.Passed = false;
         result.Message = "单笔消费超过5000元需特别审批";
         result.Severity = "high";
-        ret.AddViolation("单笔消费超过5000元需特别审批", "high", 15);
+        result.Priority = 80;
     }',
-    15,
-    '所有类目',
+    80,
+    '金额校验',
     'enabled',
     '单笔消费超过5000元需要提供特别审批',
+    'invoice_validation',
+    1,
     'system',
     NOW(),
     NOW()
 );
 
--- 19. 连号发票规则
-INSERT INTO audit_rules (
+-- 12. 发票税额不能超过发票金额
+INSERT INTO rules (
     id, 
     rule_code, 
-    rule_name, 
-    rule_content, 
+    name, 
+    definition, 
     priority, 
     category, 
     status, 
     description,
+    type,
+    enabled,
     created_by,
     created_at,
     updated_at
 ) VALUES (
     UUID(),
-    'RULE_CONSECUTIVE_INVOICE',
-    '连号发票需特别审核',
-    'rule consecutive_invoice "连号发票检查" salience 12 {
+    'RULE_TAX_AMOUNT_VALID',
+    '发票税额不能超过发票金额',
+    'rule tax_amount_valid "税额检查" salience 75 {
     when
-        isConsecutiveInvoice(data.InvoiceNumbers)
-    then
-        result.Passed = true;
-        result.Message = "连号发票需特别审核";
-        result.Severity = "medium";
-        ret.AddViolation("连号发票需特别审核", "medium", 12);
-    }',
-    12,
-    '发票校验',
-    'enabled',
-    '连号发票需要特别审核，防止拆分报销',
-    'system',
-    NOW(),
-    NOW()
-);
-
--- 20. 三单匹配规则
-INSERT INTO audit_rules (
-    id, 
-    rule_code, 
-    rule_name, 
-    rule_content, 
-    priority, 
-    category, 
-    status, 
-    description,
-    created_by,
-    created_at,
-    updated_at
-) VALUES (
-    UUID(),
-    'RULE_THREE_DOCUMENT_MATCH',
-    '三单匹配检查',
-    'rule three_document_match "三单匹配检查" salience 25 {
-    when
-        data.Invoice.Amount > 1000.0 && !hasOrderAndReceipt(data.Invoice.ID)
+        data.Invoice.TaxAmount > data.Invoice.Amount
     then
         result.Passed = false;
-        result.Message = "大额消费需提供订单、发票、收据三单匹配";
+        result.Message = "发票税额不能超过发票金额";
         result.Severity = "high";
-        ret.AddViolation("大额消费需提供订单、发票、收据三单匹配", "high", 25);
+        result.Priority = 75;
     }',
-    25,
-    '发票校验',
+    75,
+    '税额校验',
     'enabled',
-    '金额超过1000元的消费需要提供订单、发票、收据三单匹配',
+    '发票税额必须小于等于发票金额',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 13. 发票购买方名称不能为空
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_BUYER_NAME_REQUIRED',
+    '发票购买方名称不能为空',
+    'rule buyer_name_required "购买方名称检查" salience 70 {
+    when
+        data.Invoice.BuyerName == ""
+    then
+        result.Passed = false;
+        result.Message = "发票购买方名称不能为空";
+        result.Severity = "high";
+        result.Priority = 70;
+    }',
+    70,
+    '基础校验',
+    'enabled',
+    '发票购买方名称为必填字段',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 14. 发票销售方名称不能为空
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_SELLER_NAME_REQUIRED',
+    '发票销售方名称不能为空',
+    'rule seller_name_required "销售方名称检查" salience 69 {
+    when
+        data.Invoice.SellerName == ""
+    then
+        result.Passed = false;
+        result.Message = "发票销售方名称不能为空";
+        result.Severity = "high";
+        result.Priority = 69;
+    }',
+    69,
+    '基础校验',
+    'enabled',
+    '发票销售方名称为必填字段',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 15. 发票商品名称不能为空
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_COMMODITY_NAME_REQUIRED',
+    '发票商品名称不能为空',
+    'rule commodity_name_required "商品名称检查" salience 68 {
+    when
+        data.Invoice.CommodityName == ""
+    then
+        result.Passed = false;
+        result.Message = "发票商品名称不能为空";
+        result.Severity = "medium";
+        result.Priority = 68;
+    }',
+    68,
+    '基础校验',
+    'enabled',
+    '发票商品名称为必填字段',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 16. 整数金额发票需特别审核（金额大于1000元且为整数）
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_ROUND_AMOUNT',
+    '整数金额发票需特别审核',
+    'rule round_amount "整数金额检查" salience 50 {
+    when
+        data.Invoice.Amount > 1000.0 && data.Invoice.Amount == float64(int(data.Invoice.Amount))
+    then
+        result.Passed = true;
+        result.Message = "整数金额发票需特别审核";
+        result.Severity = "low";
+        result.Priority = 50;
+    }',
+    50,
+    '风险提示',
+    'enabled',
+    '金额为整数的发票（特别是大额发票）需要特别审核，防止虚开发票',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 17. 发票图片路径不能为空
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_IMAGE_PATH_REQUIRED',
+    '发票图片路径不能为空',
+    'rule image_path_required "图片路径检查" salience 60 {
+    when
+        data.Invoice.ImagePath == ""
+    then
+        result.Passed = false;
+        result.Message = "发票图片路径不能为空";
+        result.Severity = "high";
+        result.Priority = 60;
+    }',
+    60,
+    '基础校验',
+    'enabled',
+    '发票图片路径为必填字段',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 18. 发票状态必须为已识别
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_STATUS_VALID',
+    '发票状态必须为已识别',
+    'rule status_valid "发票状态检查" salience 65 {
+    when
+        data.Invoice.Status != "recognized"
+    then
+        result.Passed = false;
+        result.Message = "发票状态必须为已识别";
+        result.Severity = "high";
+        result.Priority = 65;
+    }',
+    65,
+    '状态校验',
+    'enabled',
+    '发票必须完成OCR识别才能进行审核',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 19. 培训费单次限额2000元
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_TRAINING_LIMIT',
+    '培训费单次限额2000元',
+    'rule training_limit "培训费限额检查" salience 84 {
+    when
+        data.Invoice.Category == "培训费" && data.Invoice.Amount > 2000.0
+    then
+        result.Passed = false;
+        result.Message = "培训费超过2000元上限";
+        result.Severity = "medium";
+        result.Priority = 84;
+    }',
+    84,
+    '金额校验',
+    'enabled',
+    '培训费单次不得超过2000元，超出部分需特殊审批',
+    'invoice_validation',
+    1,
+    'system',
+    NOW(),
+    NOW()
+);
+
+-- 20. 会议费单次限额3000元
+INSERT INTO rules (
+    id, 
+    rule_code, 
+    name, 
+    definition, 
+    priority, 
+    category, 
+    status, 
+    description,
+    type,
+    enabled,
+    created_by,
+    created_at,
+    updated_at
+) VALUES (
+    UUID(),
+    'RULE_MEETING_LIMIT',
+    '会议费单次限额3000元',
+    'rule meeting_limit "会议费限额检查" salience 83 {
+    when
+        data.Invoice.Category == "会议费" && data.Invoice.Amount > 3000.0
+    then
+        result.Passed = false;
+        result.Message = "会议费超过3000元上限";
+        result.Severity = "medium";
+        result.Priority = 83;
+    }',
+    83,
+    '金额校验',
+    'enabled',
+    '会议费单次不得超过3000元，超出部分需特殊审批',
+    'invoice_validation',
+    1,
     'system',
     NOW(),
     NOW()

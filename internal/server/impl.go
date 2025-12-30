@@ -176,7 +176,7 @@ func (s *serverImpl) RegisterRoutes() {
 
 	// 创建领域服务
 	reimbursementDomainService := reimbursement.NewDomainService(reimbursementRepo, loggerInstance)
-	ocrDomainService := ocr.NewParserService(ocrProvider, ocrRepo, loggerInstance)
+	ocrDomainService := ocr.NewParserService(ocrProvider, ocrRepo, loggerInstance, "./uploads")
 
 	// 创建应用服务
 	reimbursementAppService := service.NewReimbursementApplicationService(
@@ -200,12 +200,17 @@ func (s *serverImpl) RegisterRoutes() {
 	ruleService := rule.NewRuleService(ruleRepo, loggerInstance, ruleEngine)
 
 	// 创建RAG服务
-	llmClient := rag.NewLLMClient(
-		s.appConfig.LLM.APIKey,
-		s.appConfig.LLM.BaseURL,
-		s.appConfig.LLM.Model,
+	llmClient := rag.NewLLMClientWithEmbedding(
+		s.appConfig.RAG.APIKey,
+		s.appConfig.RAG.APIBase,
+		s.appConfig.RAG.Model,
 		s.appConfig.LLM.Timeout,
 		loggerInstance,
+		s.appConfig.RAG.EmbeddingProvider,
+		s.appConfig.RAG.EmbeddingModel,
+		s.appConfig.RAG.EmbeddingAPIKey,
+		s.appConfig.RAG.EmbeddingAPIBase,
+		s.appConfig.RAG.EmbeddingDimension,
 	)
 
 	documentProcessor := rag.NewDocumentProcessor(500, 50, loggerInstance)
@@ -240,6 +245,7 @@ func (s *serverImpl) RegisterRoutes() {
 	s.engine.POST("/api/v1/reimbursement/upload", uploadHandler.UploadReimbursement)
 	s.engine.POST("/api/v1/invoices/upload", uploadHandler.UploadInvoices)
 	s.engine.POST("/api/v1/invoices/batch-upload", uploadHandler.BatchUpload)
+	s.engine.POST("/api/v1/invoices/ocr", uploadHandler.TriggerOCRParsing)
 
 	// 创建审核处理器
 	auditHandler := handler.NewAuditHandler(auditAppService)
