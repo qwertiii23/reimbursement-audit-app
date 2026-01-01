@@ -26,6 +26,7 @@ type InvoiceValidationData struct {
 	InvoiceTypes                  []string                     `json:"invoice_types"`                       // 允许的发票类型列表
 	ApplyDate                     time.Time                    `json:"apply_date"`                          // 报销申请日期
 	IsInvoiceDateOlderThan6Months bool                         `json:"is_invoice_date_older_than_6_months"` // 发票日期是否超过6个月
+	Price                         float64                      `json:"price"`
 }
 
 // RuleHelperContext 规则引擎辅助函数上下文

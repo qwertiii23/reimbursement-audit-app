@@ -47,6 +47,7 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 	s.logger.WithContext(ctx).Info("开始审核", logger.NewField("reimbursement_id", reimbursementID))
 
 	reimbursement, err := s.reimbursementRepo.GetReimbursementByID(ctx, reimbursementID)
+	reimbursement.Invoices, err = s.reimbursementRepo.GetInvoicesByReimbursementID(ctx, reimbursementID)
 	if err != nil {
 		s.logger.WithContext(ctx).Error("获取报销单失败", logger.NewField("error", err))
 		return nil, fmt.Errorf("获取报销单失败: %w", err)
@@ -156,9 +157,11 @@ func (s *Service) executeRuleValidation(ctx context.Context, reimbursement *reim
 			logger.NewField("发票号码", invoice.Number))
 
 		validationData := &rule.InvoiceValidationData{
-			Invoice:       invoice,
-			Reimbursement: reimbursement,
-			ApplyDate:     reimbursement.ApplyDate,
+			Invoice:                       invoice,
+			Reimbursement:                 reimbursement,
+			ApplyDate:                     reimbursement.ApplyDate,
+			IsInvoiceDateOlderThan6Months: invoice.Date != nil && invoice.Date.Before(reimbursement.ApplyDate.AddDate(0, -6, 0)),
+			Price:                         invoice.Price,
 		}
 
 		results, err := s.ruleService.ValidateAllRules(ctx, validationData)

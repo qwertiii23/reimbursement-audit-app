@@ -209,6 +209,8 @@ func (s *ParserService) updateInvoiceFromOCR(ctx context.Context, invoice *Invoi
 
 	invoice.VerificationTime = &ocrResult.ParseTime
 
+	invoice.Type = ocrResult.InvoiceType
+
 	if len(ocrResult.Items) > 0 {
 		invoice.TotalItems = len(ocrResult.Items)
 

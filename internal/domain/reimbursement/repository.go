@@ -1,4 +1,5 @@
 package reimbursement
+
 // repository.go 报销单仓储接口定义
 // 功能点：
 // 1. 定义报销单仓储接口
@@ -10,6 +11,7 @@ package reimbursement
 
 import (
 	"context"
+	"reimbursement-audit/internal/domain/ocr"
 )
 
 // Repository 报销单仓储接口
@@ -23,6 +25,7 @@ type Repository interface {
 	ListReimbursementsByDateRange(ctx context.Context, startDate, endDate string, page, size int) ([]*Reimbursement, int64, error)
 	ListReimbursementsByStatus(ctx context.Context, status string, page, size int) ([]*Reimbursement, int64, error)
 	SearchReimbursements(ctx context.Context, keyword string, page, size int) ([]*Reimbursement, int64, error)
+	GetInvoicesByReimbursementID(ctx context.Context, id string) ([]*ocr.Invoice, error)
 
 	// 审核结果相关方法
 	// CreateAuditResult(ctx context.Context, result *AuditResult) error

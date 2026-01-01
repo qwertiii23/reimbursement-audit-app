@@ -12,6 +12,7 @@ package mysql
 import (
 	"context"
 	"errors"
+	"reimbursement-audit/internal/domain/ocr"
 	"time"
 
 	"reimbursement-audit/internal/domain/reimbursement"
@@ -308,4 +309,20 @@ func (r *ReimbursementRepository) SearchReimbursements(ctx context.Context, keyw
 	// 发票列表应由应用服务在需要时通过OCRRepository单独加载
 
 	return reimbursements, total, nil
+}
+
+func (r *ReimbursementRepository) GetInvoicesByReimbursementID(ctx context.Context, id string) ([]*ocr.Invoice, error) {
+	var invoices []*ocr.Invoice
+	result := r.client.GetDB().WithContext(ctx).
+		Where("reimbursement_id = ?", id).
+		Find(&invoices)
+
+	if result.Error != nil {
+		r.logger.WithContext(ctx).Error("获取发票列表失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("reimbursement_id", id))
+		return nil, result.Error
+	}
+
+	return invoices, nil
 }

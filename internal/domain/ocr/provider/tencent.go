@@ -141,7 +141,6 @@ func (p *TencentProvider) parseResponse(response *tccr.VatInvoiceOCRResponse) (*
 			if item.Name != nil && item.Value != nil {
 				p.logger.Info("解析OCR响应",
 					logger.NewField("index", i),
-					logger.NewField("name", *item.Name),
 					logger.NewField("value", *item.Value))
 			}
 		}
