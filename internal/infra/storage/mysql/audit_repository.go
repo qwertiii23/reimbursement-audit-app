@@ -16,6 +16,7 @@ type AuditResultModel struct {
 	ID              string     `gorm:"column:id;primaryKey;type:varchar(36)"`
 	ReimbursementID string     `gorm:"column:reimbursement_id;type:varchar(36);index"`
 	Status          string     `gorm:"column:status;type:varchar(20)"`
+	WorkflowStatus  string     `gorm:"column:workflow_status;type:varchar(32)"`
 	RulePass        bool       `gorm:"column:rule_pass;type:tinyint(1)"`
 	RAGPass         bool       `gorm:"column:rag_pass;type:tinyint(1)"`
 	FinalPass       bool       `gorm:"column:final_pass;type:tinyint(1)"`
@@ -185,6 +186,7 @@ func (r *AuditRepository) toModel(domain *audit.AuditResult) *AuditResultModel {
 		ID:              domain.ID,
 		ReimbursementID: domain.ReimbursementID,
 		Status:          string(domain.Status),
+		WorkflowStatus:  string(domain.WorkflowStatus),
 		RulePass:        domain.RulePass,
 		RAGPass:         domain.RAGPass,
 		FinalPass:       domain.FinalPass,
@@ -236,5 +238,110 @@ func (r *AuditRepository) toDomain(model *AuditResultModel) *audit.AuditResult {
 		Duration:        model.Duration,
 		CreatedAt:       model.CreatedAt,
 		UpdatedAt:       model.UpdatedAt,
+	}
+}
+
+type AuditFlowLogModel struct {
+	ID              string    `gorm:"column:id;primaryKey;type:varchar(36)"`
+	ReimbursementID string    `gorm:"column:reimbursement_id;type:varchar(36);index:idx_reimbursement_id"`
+	AuditID         string    `gorm:"column:audit_id;type:varchar(36);index:idx_audit_id"`
+	FlowStatus      string    `gorm:"column:flow_status;type:varchar(32);index:idx_flow_status"`
+	FlowType        string    `gorm:"column:flow_type;type:varchar(16)"`
+	OperatorID      *string   `gorm:"column:operator_id;type:varchar(36)"`
+	OperatorName    *string   `gorm:"column:operator_name;type:varchar(64)"`
+	Action          string    `gorm:"column:action;type:varchar(32)"`
+	Reason          *string   `gorm:"column:reason;type:text"`
+	Result          *string   `gorm:"column:result;type:text"`
+	IPAddress       *string   `gorm:"column:ip_address;type:varchar(64)"`
+	CreatedAt       time.Time `gorm:"column:created_at;type:datetime;index:idx_created_at"`
+}
+
+func (AuditFlowLogModel) TableName() string {
+	return "audit_flow_logs"
+}
+
+func (r *AuditRepository) CreateFlowLog(ctx context.Context, flowLog *audit.AuditFlowLog) error {
+	model := r.toFlowLogModel(flowLog)
+
+	db := r.client.GetDB()
+	if err := db.WithContext(ctx).Create(model).Error; err != nil {
+		r.logger.WithContext(ctx).Error("创建流程日志失败",
+			logger.NewField("error", err.Error()),
+			logger.NewField("flow_log_id", flowLog.ID))
+		return err
+	}
+
+	r.logger.WithContext(ctx).Info("创建流程日志成功",
+		logger.NewField("flow_log_id", flowLog.ID))
+	return nil
+}
+
+func (r *AuditRepository) GetFlowLogsByReimbursementID(ctx context.Context, reimbursementID string) ([]*audit.AuditFlowLog, error) {
+	db := r.client.GetDB()
+	var models []AuditFlowLogModel
+	if err := db.WithContext(ctx).Where("reimbursement_id = ?", reimbursementID).Order("created_at ASC").Find(&models).Error; err != nil {
+		r.logger.WithContext(ctx).Error("获取流程日志失败",
+			logger.NewField("error", err.Error()),
+			logger.NewField("reimbursement_id", reimbursementID))
+		return nil, err
+	}
+
+	flowLogs := make([]*audit.AuditFlowLog, len(models))
+	for i, model := range models {
+		flowLogs[i] = r.toFlowLogDomain(&model)
+	}
+
+	return flowLogs, nil
+}
+
+func (r *AuditRepository) GetFlowLogsByAuditID(ctx context.Context, auditID string) ([]*audit.AuditFlowLog, error) {
+	db := r.client.GetDB()
+	var models []AuditFlowLogModel
+	if err := db.WithContext(ctx).Where("audit_id = ?", auditID).Order("created_at ASC").Find(&models).Error; err != nil {
+		r.logger.WithContext(ctx).Error("获取流程日志失败",
+			logger.NewField("error", err.Error()),
+			logger.NewField("audit_id", auditID))
+		return nil, err
+	}
+
+	flowLogs := make([]*audit.AuditFlowLog, len(models))
+	for i, model := range models {
+		flowLogs[i] = r.toFlowLogDomain(&model)
+	}
+
+	return flowLogs, nil
+}
+
+func (r *AuditRepository) toFlowLogModel(domain *audit.AuditFlowLog) *AuditFlowLogModel {
+	return &AuditFlowLogModel{
+		ID:              domain.ID,
+		ReimbursementID: domain.ReimbursementID,
+		AuditID:         domain.AuditID,
+		FlowStatus:      string(domain.FlowStatus),
+		FlowType:        string(domain.FlowType),
+		OperatorID:      domain.OperatorID,
+		OperatorName:    domain.OperatorName,
+		Action:          string(domain.Action),
+		Reason:          domain.Reason,
+		Result:          domain.Result,
+		IPAddress:       domain.IPAddress,
+		CreatedAt:       domain.CreatedAt,
+	}
+}
+
+func (r *AuditRepository) toFlowLogDomain(model *AuditFlowLogModel) *audit.AuditFlowLog {
+	return &audit.AuditFlowLog{
+		ID:              model.ID,
+		ReimbursementID: model.ReimbursementID,
+		AuditID:         model.AuditID,
+		FlowStatus:      audit.FlowStatus(model.FlowStatus),
+		FlowType:        audit.FlowType(model.FlowType),
+		OperatorID:      model.OperatorID,
+		OperatorName:    model.OperatorName,
+		Action:          audit.FlowAction(model.Action),
+		Reason:          model.Reason,
+		Result:          model.Result,
+		IPAddress:       model.IPAddress,
+		CreatedAt:       model.CreatedAt,
 	}
 }

@@ -24,6 +24,7 @@ type Repository interface {
 	ListReimbursementsByUserID(ctx context.Context, userID string, page, size int) ([]*Reimbursement, int64, error)
 	ListReimbursementsByDateRange(ctx context.Context, startDate, endDate string, page, size int) ([]*Reimbursement, int64, error)
 	ListReimbursementsByStatus(ctx context.Context, status string, page, size int) ([]*Reimbursement, int64, error)
+	ListAllReimbursements(ctx context.Context, page, size int) ([]*Reimbursement, int64, error)
 	SearchReimbursements(ctx context.Context, keyword string, page, size int) ([]*Reimbursement, int64, error)
 	GetInvoicesByReimbursementID(ctx context.Context, id string) ([]*ocr.Invoice, error)
 

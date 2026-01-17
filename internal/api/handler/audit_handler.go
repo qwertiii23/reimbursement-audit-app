@@ -62,6 +62,31 @@ func (h *AuditHandler) StartAudit(c *gin.Context) {
 	response.SuccessResponse(c, auditResponse)
 }
 
+// WithdrawAudit 撤回报销单审核
+func (h *AuditHandler) WithdrawAudit(c *gin.Context) {
+	middleware.LogInfo(c, "撤回报销单审核请求", "path", c.Request.URL.Path,
+		"method", c.Request.Method, "remote_addr", c.ClientIP())
+	traceId := middleware.GetTraceId(c)
+	ctx := middleware.WithTraceId(context.Background(), traceId)
+
+	reimbursementID := c.Param("id")
+	if reimbursementID == "" {
+		middleware.LogError(c, "报销单ID不能为空", "context", ctx)
+		response.ErrorResponse(c, response.CodeInvalidParams, "报销单ID不能为空")
+		return
+	}
+
+	err := h.auditService.WithdrawAudit(ctx, reimbursementID)
+	if err != nil {
+		middleware.LogError(c, "撤回报销单审核失败", "error", err.Error(), "context", ctx)
+		response.ErrorResponse(c, response.CodeInternalError, err.Error())
+		return
+	}
+
+	middleware.LogInfo(c, "撤回报销单审核成功", "reimbursement_id", reimbursementID, "context", ctx)
+	response.SuccessResponse(c, gin.H{"message": "撤回成功"})
+}
+
 // GetAuditStatus 获取审核状态
 func (h *AuditHandler) GetAuditStatus(c *gin.Context) {
 	middleware.LogInfo(c, "获取审核状态请求", "path", c.Request.URL.Path,
@@ -135,4 +160,80 @@ func (h *AuditHandler) RetryAudit(c *gin.Context) {
 
 	middleware.LogInfo(c, "重试审核成功", "audit_id", auditID, "context", ctx)
 	response.SuccessResponse(c, resultResponse)
+}
+
+// ManualAudit 人工审核
+func (h *AuditHandler) ManualAudit(c *gin.Context) {
+	middleware.LogInfo(c, "人工审核请求", "path", c.Request.URL.Path,
+		"method", c.Request.Method, "remote_addr", c.ClientIP())
+	traceId := middleware.GetTraceId(c)
+	ctx := middleware.WithTraceId(context.Background(), traceId)
+
+	var req request.ManualAuditRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.LogError(c, "JSON数据绑定失败", "error", err.Error(), "context", ctx)
+		response.ErrorResponse(c, response.CodeInvalidParams, err.Error())
+		return
+	}
+
+	if err := req.Validate(); err != nil {
+		middleware.LogError(c, "请求参数校验失败", "error", err.Error(), "context", ctx)
+		response.ErrorResponse(c, response.CodeInvalidParams, err.Error())
+		return
+	}
+
+	userID := c.GetString("user_id")
+	userName := c.GetString("user_name")
+	if userID == "" {
+		middleware.LogError(c, "未获取到用户信息", "context", ctx)
+		response.ErrorResponse(c, response.CodeUnauthorized, "未获取到用户信息")
+		return
+	}
+
+	ipAddress := c.ClientIP()
+
+	auditResponse, err := h.auditService.ManualAudit(ctx, &req, userID, userName, ipAddress)
+	if err != nil {
+		middleware.LogError(c, "人工审核失败", "error", err.Error(), "context", ctx)
+		response.ErrorResponse(c, response.CodeInternalError, err.Error())
+		return
+	}
+
+	middleware.LogInfo(c, "人工审核成功", "audit_id", req.AuditID, "context", ctx)
+	response.SuccessResponse(c, auditResponse)
+}
+
+// GetFlowLogs 获取流程日志
+func (h *AuditHandler) GetFlowLogs(c *gin.Context) {
+	middleware.LogInfo(c, "获取流程日志请求", "path", c.Request.URL.Path,
+		"method", c.Request.Method, "remote_addr", c.ClientIP())
+	traceId := middleware.GetTraceId(c)
+	ctx := middleware.WithTraceId(context.Background(), traceId)
+
+	reimbursementID := c.Query("reimbursement_id")
+	auditID := c.Query("audit_id")
+
+	if reimbursementID == "" && auditID == "" {
+		middleware.LogError(c, "缺少查询参数", "context", ctx)
+		response.ErrorResponse(c, response.CodeInvalidParams, "请提供reimbursement_id或audit_id")
+		return
+	}
+
+	var flowLogResponses []*response.FlowLogResponse
+	var err error
+
+	if reimbursementID != "" {
+		flowLogResponses, err = h.auditService.GetFlowLogsByReimbursementID(ctx, reimbursementID)
+	} else {
+		flowLogResponses, err = h.auditService.GetFlowLogsByAuditID(ctx, auditID)
+	}
+
+	if err != nil {
+		middleware.LogError(c, "获取流程日志失败", "error", err.Error(), "context", ctx)
+		response.ErrorResponse(c, response.CodeInternalError, err.Error())
+		return
+	}
+
+	middleware.LogInfo(c, "获取流程日志成功", "count", len(flowLogResponses), "context", ctx)
+	response.SuccessResponse(c, flowLogResponses)
 }

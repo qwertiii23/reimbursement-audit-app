@@ -41,6 +41,7 @@ type Reimbursement struct {
 	ApprovalRequired bool           `json:"approval_required" gorm:"type:boolean;default:false;column:approval_required"`       // 是否需要审批
 	ApprovedBy       string         `json:"approved_by" gorm:"type:varchar(36);column:approved_by"`                             // 审批人ID
 	ApprovedAt       *time.Time     `json:"approved_at" gorm:"type:datetime;column:approved_at"`                                // 审批时间
+	AuditID          string         `json:"audit_id" gorm:"type:varchar(36);column:audit_id"`                                  // 审核ID
 	Invoices         []*ocr.Invoice `json:"invoices" gorm:"foreignKey:ReimbursementID;constraint:OnDelete:CASCADE"`             // 发票列表
 	Status           string         `json:"status" gorm:"type:varchar(20);not null;default:'pending_submission';column:status"` // 状态(待提交/待审核/审核中/已完成/已驳回)
 	CreatedAt        time.Time      `json:"created_at" gorm:"autoCreateTime"`                                                   // 创建时间

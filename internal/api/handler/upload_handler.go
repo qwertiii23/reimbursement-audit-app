@@ -272,3 +272,44 @@ func (h *UploadHandler) TriggerOCRParsing(c *gin.Context) {
 		"status":     "OCR解析已触发",
 	})
 }
+
+// UpdateInvoiceImage 更新发票图片
+func (h *UploadHandler) UpdateInvoiceImage(c *gin.Context) {
+	middleware.LogInfo(c, "开始处理发票图片修改请求",
+		"path", c.Request.URL.Path,
+		"method", c.Request.Method,
+		"remote_addr", c.ClientIP())
+
+	traceId := middleware.GetTraceId(c)
+	ctx := middleware.WithTraceId(context.Background(), traceId)
+
+	invoiceID := c.PostForm("invoice_id")
+	if invoiceID == "" {
+		response.ErrorResponse(c, response.CodeInvalidParams, "缺少发票ID invoice_id")
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		middleware.LogError(c, "获取上传文件失败",
+			"error", err.Error(),
+			"form_field", "file")
+		response.ErrorResponse(c, response.CodeInvalidParams, "获取文件失败: "+err.Error())
+		return
+	}
+
+	result, err := h.reimbursementAppService.UpdateInvoiceImage(ctx, invoiceID, file)
+	if err != nil {
+		middleware.LogError(c, "更新发票图片失败",
+			"error", err.Error(),
+			"invoice_id", invoiceID,
+			"filename", file.Filename,
+			"context", ctx)
+		response.ErrorResponse(c, response.CodeInternalError, err.Error())
+		return
+	}
+
+	middleware.LogInfo(c, "发票图片修改处理完成",
+		"invoice_id", result.InvoiceID)
+	response.SuccessResponse(c, result)
+}

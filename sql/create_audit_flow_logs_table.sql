@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `audit_flow_logs` (
+  `id` VARCHAR(36) NOT NULL COMMENT '日志唯一ID（UUID格式）',
+  `reimbursement_id` VARCHAR(36) NOT NULL COMMENT '关联报销单ID',
+  `audit_id` VARCHAR(36) NOT NULL COMMENT '关联审核ID',
+  `flow_status` VARCHAR(32) NOT NULL COMMENT '流程状态（枚举值：智能审核开始/智能审核通过/智能审核失败/人工审核开始/人工审核通过/人工审核驳回）',
+  `flow_type` VARCHAR(16) NOT NULL COMMENT '流程类型（枚举值：intelligent-智能审核/manual-人工审核）',
+  `operator_id` VARCHAR(36) DEFAULT NULL COMMENT '操作人ID（人工审核时必填）',
+  `operator_name` VARCHAR(64) DEFAULT NULL COMMENT '操作人姓名',
+  `action` VARCHAR(32) NOT NULL COMMENT '操作动作（枚举值：start_audit/pass_audit/reject_audit）',
+  `reason` TEXT DEFAULT NULL COMMENT '操作原因/说明',
+  `result` TEXT DEFAULT NULL COMMENT '操作结果（JSON格式，存储详细结果）',
+  `ip_address` VARCHAR(64) DEFAULT NULL COMMENT '操作人IP地址',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_reimbursement_id` (`reimbursement_id`) COMMENT '按报销单ID查询索引',
+  KEY `idx_audit_id` (`audit_id`) COMMENT '按审核ID查询索引',
+  KEY `idx_flow_status` (`flow_status`) COMMENT '按流程状态查询索引',
+  KEY `idx_created_at` (`created_at`) COMMENT '按创建时间查询索引',
+  KEY `idx_reimbursement_created` (`reimbursement_id`, `created_at`) COMMENT '报销单+时间联合索引，优化流程日志查询'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='审核流程日志表（记录审核全流程流转）';

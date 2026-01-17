@@ -1,0 +1,94 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Launch Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/server/main.go",
+            "args": [
+                "-config",
+                "configs/config.dev.yaml"
+            ],
+            "env": {
+                "GO111MODULE": "on"
+            },
+            "showLog": true,
+            "cwd": "${workspaceFolder}" 
+        },
+        {
+            "name": "Launch API",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/api/main.go",
+            "env": {
+                "GO111MODULE": "on"
+            },
+            "showLog": true
+        },
+        {
+            "name": "Run Database Migration",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/migrate/main.go",
+            "env": {
+                "GO111MODULE": "on"
+            },
+            "showLog": true
+        },
+        {
+            "name": "Test Invoice Validator",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}/internal/domain/rule",
+            "args": [
+                "-test.v",
+                "-test.run",
+                "TestInvoiceValidator"
+            ],
+            "env": {
+                "GO111MODULE": "on"
+            },
+            "showLog": true
+        },
+        {
+            "name": "Test All Rules",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}/internal/domain/rule",
+            "args": [
+                "-test.v",
+                "-test.run",
+                "TestRule"
+            ],
+            "env": {
+                "GO111MODULE": "on"
+            },
+            "showLog": true
+        },
+        {
+            "name": "Debug Current File",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${file}",
+            "env": {
+                "GO111MODULE": "on"
+            },
+            "showLog": true
+        },
+        {
+            "name": "Attach to Process",
+            "type": "go",
+            "request": "attach",
+            "mode": "local",
+            "processId": 0
+        }
+    ]
+}

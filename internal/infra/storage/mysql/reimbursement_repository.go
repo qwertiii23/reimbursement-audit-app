@@ -13,7 +13,6 @@ import (
 	"context"
 	"errors"
 	"reimbursement-audit/internal/domain/ocr"
-	"time"
 
 	"reimbursement-audit/internal/domain/reimbursement"
 	"reimbursement-audit/internal/pkg/logger"
@@ -73,22 +72,7 @@ func (r *ReimbursementRepository) GetReimbursementByID(ctx context.Context, id s
 // UpdateReimbursement 更新报销单
 func (r *ReimbursementRepository) UpdateReimbursement(ctx context.Context, reimbursement *reimbursement.Reimbursement) error {
 	// 使用GORM更新报销单
-	result := r.client.GetDB().WithContext(ctx).Model(reimbursement).
-		Where("id = ?", reimbursement.ID).
-		Updates(map[string]interface{}{
-			"user_id":      reimbursement.UserID,
-			"user_name":    reimbursement.UserName,
-			"department":   reimbursement.Department,
-			"type":         reimbursement.Type,
-			"title":        reimbursement.Title,
-			"description":  reimbursement.Description,
-			"total_amount": reimbursement.TotalAmount,
-			"currency":     reimbursement.Currency,
-			"apply_date":   reimbursement.ApplyDate,
-			"expense_date": reimbursement.ExpenseDate,
-			"status":       reimbursement.Status,
-			"updated_at":   time.Now(),
-		})
+	result := r.client.GetDB().WithContext(ctx).Save(reimbursement)
 
 	if result.Error != nil {
 		r.logger.WithContext(ctx).Error("更新报销单失败",
@@ -266,6 +250,36 @@ func (r *ReimbursementRepository) ListReimbursementsByStatus(ctx context.Context
 
 	// 不在此处加载发票列表，保持聚合根的独立性
 	// 发票列表应由应用服务在需要时通过OCRRepository单独加载
+
+	return reimbursements, total, nil
+}
+
+// ListAllReimbursements 获取所有报销单列表（管理员使用）
+func (r *ReimbursementRepository) ListAllReimbursements(ctx context.Context, page, size int) ([]*reimbursement.Reimbursement, int64, error) {
+	var total int64
+	countResult := r.client.GetDB().WithContext(ctx).Model(&reimbursement.Reimbursement{}).Count(&total)
+
+	if countResult.Error != nil {
+		r.logger.WithContext(ctx).Error("获取报销单总数失败",
+			logger.NewField("error", countResult.Error.Error()))
+		return nil, 0, countResult.Error
+	}
+
+	offset := (page - 1) * size
+	var reimbursements []*reimbursement.Reimbursement
+	result := r.client.GetDB().WithContext(ctx).
+		Order("created_at DESC").
+		Limit(size).
+		Offset(offset).
+		Find(&reimbursements)
+
+	if result.Error != nil {
+		r.logger.WithContext(ctx).Error("获取报销单列表失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("page", page),
+			logger.NewField("size", size))
+		return nil, 0, result.Error
+	}
 
 	return reimbursements, total, nil
 }

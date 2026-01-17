@@ -12,6 +12,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // AESEncrypt AES加密
@@ -159,7 +163,7 @@ func GenerateRSAKeyPair(bits int) (privateKey, publicKey []byte, err error) {
 func EncryptWithPassword(data []byte, password string) ([]byte, error) {
 	// 使用密码生成密钥
 	key := sha256.Sum256([]byte(password))
-	
+
 	// 使用AES加密
 	return AESEncrypt(data, key[:])
 }
@@ -168,7 +172,7 @@ func EncryptWithPassword(data []byte, password string) ([]byte, error) {
 func DecryptWithPassword(data []byte, password string) ([]byte, error) {
 	// 使用密码生成密钥
 	key := sha256.Sum256([]byte(password))
-	
+
 	// 使用AES解密
 	return AESDecrypt(data, key[:])
 }
@@ -233,4 +237,50 @@ func GenerateRandomString(length int) (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
+}
+
+// HashPassword 哈希密码
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
+}
+
+// ComparePassword 比较密码
+func ComparePassword(hashedPassword, password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+}
+
+var jwtSecret = []byte("reimbursement-audit-secret-key-2024")
+
+// GenerateToken 生成JWT token
+func GenerateToken(userID, username, role string) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id":  userID,
+		"username": username,
+		"role":     role,
+		"exp":      time.Now().Add(time.Hour * 24 * 7).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
+}
+
+// ParseToken 解析JWT token
+func ParseToken(tokenString string) (jwt.MapClaims, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return jwtSecret, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, fmt.Errorf("invalid token")
 }

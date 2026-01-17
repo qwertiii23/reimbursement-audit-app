@@ -16,6 +16,7 @@ import (
 	"reimbursement-audit/internal/domain/rag"
 	"reimbursement-audit/internal/domain/reimbursement"
 	"reimbursement-audit/internal/domain/rule"
+	"reimbursement-audit/internal/domain/user"
 	storage "reimbursement-audit/internal/infra/storage/file"
 	mysqlRepo "reimbursement-audit/internal/infra/storage/mysql"
 	"reimbursement-audit/internal/pkg/logger"
@@ -231,6 +232,9 @@ func (s *serverImpl) RegisterRoutes() {
 		loggerInstance.Error("创建向量存储失败", logger.NewField("error", err.Error()))
 	}
 
+	userRepo := mysqlRepo.NewUserRepository(mysqlClient, loggerInstance)
+	userService := user.NewUserService(userRepo, loggerInstance)
+
 	ragService := rag.NewRAGService(loggerInstance, llmClient, documentProcessor, vectorStore, promptBuilder)
 
 	// 创建审核仓储和审核服务
@@ -246,6 +250,7 @@ func (s *serverImpl) RegisterRoutes() {
 	s.engine.POST("/api/v1/invoices/upload", uploadHandler.UploadInvoices)
 	s.engine.POST("/api/v1/invoices/batch-upload", uploadHandler.BatchUpload)
 	s.engine.POST("/api/v1/invoices/ocr", uploadHandler.TriggerOCRParsing)
+	s.engine.POST("/api/v1/invoices/update-image", uploadHandler.UpdateInvoiceImage)
 
 	// 创建审核处理器
 	auditHandler := handler.NewAuditHandler(auditAppService)
@@ -255,6 +260,7 @@ func (s *serverImpl) RegisterRoutes() {
 	s.engine.GET("/api/v1/audit/:id/status", auditHandler.GetAuditStatus)
 	s.engine.GET("/api/v1/audit/:id/result", auditHandler.GetAuditResult)
 	s.engine.POST("/api/v1/audit/:id/retry", auditHandler.RetryAudit)
+	s.engine.POST("/api/v1/audit/:id/withdraw", auditHandler.WithdrawAudit)
 
 	// 创建规则处理器
 	ruleHandler := handler.NewRuleHandler(ruleService)
@@ -268,7 +274,13 @@ func (s *serverImpl) RegisterRoutes() {
 	s.engine.PATCH("/api/v1/rules/:id/disable", ruleHandler.DisableRule)
 	s.engine.POST("/api/v1/rules/:id/test", ruleHandler.TestRule)
 
-	// 创建查询处理器
+	userHandler := handler.NewUserHandler(userService)
+
+	s.engine.POST("/api/v1/auth/login", userHandler.Login)
+
+	s.engine.POST("/api/v1/audit/:id/manual-audit", auditHandler.ManualAudit)
+	s.engine.GET("/api/v1/audit/flow-logs", auditHandler.GetFlowLogs)
+
 	queryHandler := handler.NewQueryHandler(
 		reimbursementAppService,
 		reimbursementRepo,
@@ -278,7 +290,9 @@ func (s *serverImpl) RegisterRoutes() {
 
 	// 注册查询相关路由
 	s.engine.GET("/api/v1/reimbursement/:id", queryHandler.GetReimbursementByID)
+	s.engine.PUT("/api/v1/reimbursement/:id", queryHandler.UpdateReimbursement)
 	s.engine.GET("/api/v1/reimbursements/user", queryHandler.GetReimbursementsByUserID)
+	s.engine.GET("/api/v1/reimbursements/all", queryHandler.GetAllReimbursements)
 	s.engine.GET("/api/v1/reimbursements/date-range", queryHandler.GetReimbursementsByDateRange)
 	s.engine.GET("/api/v1/reimbursement/:id/audit-report", queryHandler.GetAuditReport)
 }

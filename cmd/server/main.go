@@ -73,6 +73,10 @@ func main() {
 	// 注册路由
 	srv.RegisterRoutes()
 
+	// 设置静态文件服务
+	srv.SetupStaticFiles("/uploads", "./uploads")
+	srv.SetupStaticFiles("/api/v1/files", "./uploads")
+
 	// 设置信号处理
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

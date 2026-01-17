@@ -66,6 +66,19 @@ func (s *AuditApplicationService) GetAuditResult(ctx context.Context, auditID st
 	return response.NewAuditResultResponse(auditResult), nil
 }
 
+// WithdrawAudit 撤回报销单审核用例
+func (s *AuditApplicationService) WithdrawAudit(ctx context.Context, reimbursementID string) error {
+	s.logger.WithContext(ctx).Info("撤回报销单审核", logger.NewField("reimbursement_id", reimbursementID))
+
+	err := s.auditService.WithdrawAudit(ctx, reimbursementID)
+	if err != nil {
+		s.logger.WithContext(ctx).Error("撤回报销单审核失败", logger.NewField("error", err))
+		return fmt.Errorf("撤回报销单审核失败: %w", err)
+	}
+
+	return nil
+}
+
 // GetAuditByReimbursementID 根据报销单ID获取审核结果用例
 func (s *AuditApplicationService) GetAuditByReimbursementID(ctx context.Context, reimbursementID string) (*response.AuditResultResponse, error) {
 	s.logger.WithContext(ctx).Info("根据报销单ID获取审核结果", logger.NewField("reimbursement_id", reimbursementID))
@@ -90,4 +103,53 @@ func (s *AuditApplicationService) RetryAudit(ctx context.Context, auditID string
 	}
 
 	return response.NewAuditResponse(auditResult), nil
+}
+
+// ManualAudit 人工审核用例
+func (s *AuditApplicationService) ManualAudit(ctx context.Context, req *request.ManualAuditRequest, userID string, userName string, ipAddress string) (*response.AuditResponse, error) {
+	s.logger.WithContext(ctx).Info("人工审核", logger.NewField("audit_id", req.AuditID))
+
+	auditResult, err := s.auditService.ManualAudit(ctx, req.AuditID, req.Action, req.Reason, userID, userName, ipAddress)
+	if err != nil {
+		s.logger.WithContext(ctx).Error("人工审核失败", logger.NewField("error", err))
+		return nil, fmt.Errorf("人工审核失败: %w", err)
+	}
+
+	return response.NewAuditResponse(auditResult), nil
+}
+
+// GetFlowLogsByReimbursementID 根据报销单ID获取流程日志用例
+func (s *AuditApplicationService) GetFlowLogsByReimbursementID(ctx context.Context, reimbursementID string) ([]*response.FlowLogResponse, error) {
+	s.logger.WithContext(ctx).Info("获取流程日志", logger.NewField("reimbursement_id", reimbursementID))
+
+	flowLogs, err := s.auditService.GetFlowLogsByReimbursementID(ctx, reimbursementID)
+	if err != nil {
+		s.logger.WithContext(ctx).Error("获取流程日志失败", logger.NewField("error", err))
+		return nil, fmt.Errorf("获取流程日志失败: %w", err)
+	}
+
+	flowLogResponses := make([]*response.FlowLogResponse, len(flowLogs))
+	for i, flowLog := range flowLogs {
+		flowLogResponses[i] = response.NewFlowLogResponse(flowLog)
+	}
+
+	return flowLogResponses, nil
+}
+
+// GetFlowLogsByAuditID 根据审核ID获取流程日志用例
+func (s *AuditApplicationService) GetFlowLogsByAuditID(ctx context.Context, auditID string) ([]*response.FlowLogResponse, error) {
+	s.logger.WithContext(ctx).Info("获取流程日志", logger.NewField("audit_id", auditID))
+
+	flowLogs, err := s.auditService.GetFlowLogsByAuditID(ctx, auditID)
+	if err != nil {
+		s.logger.WithContext(ctx).Error("获取流程日志失败", logger.NewField("error", err))
+		return nil, fmt.Errorf("获取流程日志失败: %w", err)
+	}
+
+	flowLogResponses := make([]*response.FlowLogResponse, len(flowLogs))
+	for i, flowLog := range flowLogs {
+		flowLogResponses[i] = response.NewFlowLogResponse(flowLog)
+	}
+
+	return flowLogResponses, nil
 }

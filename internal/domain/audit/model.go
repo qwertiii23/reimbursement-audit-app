@@ -13,6 +13,29 @@ const (
 	AuditStatusRunning   AuditStatus = "审核中"
 	AuditStatusCompleted AuditStatus = "审核完成"
 	AuditStatusFailed    AuditStatus = "审核失败"
+	AuditStatusManual    AuditStatus = "待人工审核"
+	AuditStatusApproved  AuditStatus = "已通过"
+	AuditStatusRejected  AuditStatus = "已驳回"
+	AuditStatusWithdrawn AuditStatus = "已撤回"
+)
+
+// WorkflowStatus 工作流状态
+type WorkflowStatus string
+
+const (
+	WorkflowStatusSubmitted      WorkflowStatus = "已提交"
+	WorkflowStatusRuleAudit      WorkflowStatus = "规则审核中"
+	WorkflowStatusRulePassed     WorkflowStatus = "规则审核通过"
+	WorkflowStatusRuleFailed     WorkflowStatus = "规则审核失败"
+	WorkflowStatusRAGAudit       WorkflowStatus = "AI审核中"
+	WorkflowStatusRAGPassed      WorkflowStatus = "AI审核通过"
+	WorkflowStatusRAGFailed      WorkflowStatus = "AI审核失败"
+	WorkflowStatusManualAudit    WorkflowStatus = "待人工审核"
+	WorkflowStatusManualPassed   WorkflowStatus = "人工审核通过"
+	WorkflowStatusManualRejected WorkflowStatus = "人工审核驳回"
+	WorkflowStatusApproved       WorkflowStatus = "已通过"
+	WorkflowStatusRejected       WorkflowStatus = "已驳回"
+	WorkflowStatusWithdrawn      WorkflowStatus = "已撤回"
 )
 
 // AuditResult 审核结果
@@ -20,6 +43,7 @@ type AuditResult struct {
 	ID              string                  `json:"id"`
 	ReimbursementID string                  `json:"reimbursement_id"`
 	Status          AuditStatus             `json:"status"`
+	WorkflowStatus  WorkflowStatus          `json:"workflow_status"`
 	RulePass        bool                    `json:"rule_pass"`
 	RAGPass         bool                    `json:"rag_pass"`
 	FinalPass       bool                    `json:"final_pass"`

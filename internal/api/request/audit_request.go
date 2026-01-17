@@ -73,13 +73,20 @@ func (r *AuditHistoryRequest) Validate() error {
 	return nil
 }
 
-// Validate 校验分页请求
-func (r *PaginationRequest) Validate() error {
-	if r.Page <= 0 {
-		r.Page = 1
+// ManualAuditRequest 人工审核请求
+type ManualAuditRequest struct {
+	AuditID string `json:"audit_id" binding:"required"`
+	Action  string `json:"action" binding:"required,oneof=pass reject"`
+	Reason  string `json:"reason"`
+}
+
+// Validate 校验人工审核请求
+func (r *ManualAuditRequest) Validate() error {
+	if r.AuditID == "" {
+		return nil
 	}
-	if r.Size <= 0 || r.Size > 100 {
-		r.Size = 10
+	if r.Action != "pass" && r.Action != "reject" {
+		return nil
 	}
 	return nil
 }

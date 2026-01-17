@@ -80,10 +80,6 @@ func (s *ReimbursementApplicationService) CreateReimbursement(ctx context.Contex
 		return nil, fmt.Errorf("创建报销单失败: %w", err)
 	}
 
-	if err := s.reimbursementRepo.CreateReimbursement(ctx, reimbursementModel); err != nil {
-		return nil, fmt.Errorf("保存报销单失败: %w", err)
-	}
-
 	return response.NewReimbursementUploadResponse(
 		reimbursementModel.ID,
 		reimbursementModel.UserID,
@@ -313,4 +309,137 @@ func (s *ReimbursementApplicationService) UpdateInvoiceType(ctx context.Context,
 
 func (s *ReimbursementApplicationService) UpdateInvoiceCategory(ctx context.Context, invoiceID string, category string) error {
 	return s.UpdateInvoiceType(ctx, invoiceID, category)
+}
+
+// UpdateReimbursement 更新报销单用例
+func (s *ReimbursementApplicationService) UpdateReimbursement(ctx context.Context, req *request.UpdateReimbursementRequest) (*response.UpdateReimbursementResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, fmt.Errorf("参数校验失败: %w", err)
+	}
+
+	reimb, err := s.reimbursementRepo.GetReimbursementByID(ctx, req.ID)
+	if err != nil {
+		return nil, fmt.Errorf("获取报销单失败: %w", err)
+	}
+
+	if req.Type != nil {
+		reimb.Type = *req.Type
+	}
+	if req.Title != nil {
+		reimb.Title = *req.Title
+	}
+	if req.Description != nil {
+		reimb.Description = *req.Description
+	}
+	if req.TotalAmount != nil {
+		reimb.TotalAmount = *req.TotalAmount
+	}
+	if req.Currency != nil {
+		reimb.Currency = *req.Currency
+	}
+	if req.ApplyDate != nil {
+		applyDate, err := time.Parse("2006-01-02", *req.ApplyDate)
+		if err != nil {
+			return nil, fmt.Errorf("申请日期格式错误: %w", err)
+		}
+		reimb.ApplyDate = applyDate
+	}
+	if req.ExpenseDate != nil {
+		expenseDate, err := time.Parse("2006-01-02", *req.ExpenseDate)
+		if err != nil {
+			return nil, fmt.Errorf("费用发生日期格式错误: %w", err)
+		}
+		reimb.ExpenseDate = expenseDate
+	}
+	if req.StartDate != nil {
+		startDate, err := time.Parse("2006-01-02", *req.StartDate)
+		if err != nil {
+			return nil, fmt.Errorf("出差开始日期格式错误: %w", err)
+		}
+		reimb.StartDate = &startDate
+	}
+	if req.EndDate != nil {
+		endDate, err := time.Parse("2006-01-02", *req.EndDate)
+		if err != nil {
+			return nil, fmt.Errorf("出差结束日期格式错误: %w", err)
+		}
+		reimb.EndDate = &endDate
+	}
+	if req.Destination != nil {
+		reimb.Destination = *req.Destination
+	}
+	if req.City != nil {
+		reimb.City = *req.City
+	}
+	if req.Province != nil {
+		reimb.Province = *req.Province
+	}
+	if req.TravelReason != nil {
+		reimb.TravelReason = *req.TravelReason
+	}
+	if req.Transportation != nil {
+		reimb.Transportation = *req.Transportation
+	}
+	if req.ProjectCode != nil {
+		reimb.ProjectCode = *req.ProjectCode
+	}
+	if req.BudgetCode != nil {
+		reimb.BudgetCode = *req.BudgetCode
+	}
+
+	if err := s.reimbursementRepo.UpdateReimbursement(ctx, reimb); err != nil {
+		return nil, fmt.Errorf("更新报销单失败: %w", err)
+	}
+
+	return response.NewUpdateReimbursementResponse(
+		reimb.ID,
+		reimb.UserID,
+		reimb.UserName,
+		reimb.Type,
+		reimb.Title,
+		reimb.Description,
+		reimb.TotalAmount,
+		reimb.Currency,
+		reimb.ApplyDate,
+		reimb.ExpenseDate,
+		reimb.Status,
+		reimb.UpdatedAt,
+	), nil
+}
+
+// UpdateInvoiceImage 更新发票图片用例
+func (s *ReimbursementApplicationService) UpdateInvoiceImage(ctx context.Context, invoiceID string, fileHeader *multipart.FileHeader) (*response.UpdateInvoiceImageResponse, error) {
+	invoice, err := s.ocrRepo.GetInvoiceByID(ctx, invoiceID)
+	if err != nil {
+		return nil, fmt.Errorf("获取发票信息失败: %w", err)
+	}
+
+	oldFilePath := invoice.ImagePath
+
+	fileInfo, err := s.fileService.UploadInvoice(ctx, fileHeader)
+	if err != nil {
+		return nil, fmt.Errorf("上传新文件失败: %w", err)
+	}
+
+	invoice.ImagePath = fileInfo.Path
+	invoice.Status = "待识别"
+	invoice.UpdatedAt = time.Now()
+
+	if err := s.ocrRepo.UpdateInvoice(ctx, invoice); err != nil {
+		return nil, fmt.Errorf("更新发票记录失败: %w", err)
+	}
+
+	if oldFilePath != "" {
+		s.fileService.DeleteFile(ctx, oldFilePath)
+	}
+
+	go s.processOCRAsync(ctx, invoice.ID)
+
+	return response.NewUpdateInvoiceImageResponse(
+		invoice.ID,
+		fileInfo.Path,
+		fileInfo.Size,
+		invoice.UpdatedAt,
+		invoice.Status,
+	), nil
 }

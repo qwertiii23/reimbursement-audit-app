@@ -21,4 +21,13 @@ type Repository interface {
 
 	// DeleteAudit 删除审核记录
 	DeleteAudit(ctx context.Context, id string) error
+
+	// CreateFlowLog 创建流程日志
+	CreateFlowLog(ctx context.Context, log *AuditFlowLog) error
+
+	// GetFlowLogsByReimbursementID 根据报销单ID获取流程日志
+	GetFlowLogsByReimbursementID(ctx context.Context, reimbursementID string) ([]*AuditFlowLog, error)
+
+	// GetFlowLogsByAuditID 根据审核ID获取流程日志
+	GetFlowLogsByAuditID(ctx context.Context, auditID string) ([]*AuditFlowLog, error)
 }
