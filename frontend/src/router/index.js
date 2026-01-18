@@ -66,8 +66,14 @@ const routes = [
       {
         path: 'rules',
         name: 'Rules',
-        component: () => import('@/views/Rules.vue'),
+        component: () => import('@/views/RuleManagement.vue'),
         meta: { title: '规则管理', requiresAdmin: true }
+      },
+      {
+        path: 'knowledge',
+        name: 'Knowledge',
+        component: () => import('@/views/KnowledgeManagement.vue'),
+        meta: { title: '知识库' }
       }
     ]
   }

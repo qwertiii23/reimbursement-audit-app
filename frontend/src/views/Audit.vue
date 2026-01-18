@@ -1,13 +1,9 @@
 <template>
   <div class="audit">
-    <div class="page-header">
-      <h1>审核管理</h1>
-    </div>
-
     <el-card class="filter-card">
-      <el-form :inline="true" :model="filters">
+      <el-form :inline="true" :model="filters" class="filter-form">
         <el-form-item label="审核状态">
-          <el-select v-model="filters.status" placeholder="全部状态" clearable>
+          <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 150px;">
             <el-option label="待人工审核" value="pending_manual" />
             <el-option label="审核通过" value="approved" />
             <el-option label="审核驳回" value="rejected" />
@@ -15,15 +11,27 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="loadAudits">查询</el-button>
-          <el-button @click="resetFilters">重置</el-button>
+          <el-button @click="resetFilters" style="margin-left: 10px;">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <el-card class="table-card">
       <el-table :data="audits" v-loading="loading" stripe>
-        <el-table-column prop="id" label="审核ID" width="200" />
-        <el-table-column prop="reimbursement_id" label="报销单ID" width="200" />
+        <el-table-column prop="id" label="审核ID" width="200">
+          <template #default="{ row }">
+            <el-tooltip :content="row.id" placement="top">
+              <span class="id-text">{{ row.id.substring(0, 12) }}...</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reimbursement_id" label="报销单ID" width="200">
+          <template #default="{ row }">
+            <el-tooltip :content="row.reimbursement_id" placement="top">
+              <span class="id-text">{{ row.reimbursement_id.substring(0, 12) }}...</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
         <el-table-column prop="reimbursement_title" label="报销单标题" min-width="150" />
         <el-table-column prop="amount" label="金额" width="120">
           <template #default="{ row }">
@@ -220,17 +228,6 @@ onMounted(() => {
   padding: 20px;
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-header h1 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #2c3e50;
-  margin: 0;
-}
-
 .filter-card,
 .table-card {
   border-radius: 12px;
@@ -238,9 +235,51 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.filter-card :deep(.el-card__body) {
+  padding: 24px;
+}
+
+.filter-form :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.filter-form :deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
 .pagination {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+:deep(.el-table) {
+  font-size: 14px;
+}
+
+:deep(.el-table th) {
+  background-color: #f5f7fa;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+:deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 500;
+}
+
+.id-text {
+  cursor: pointer;
+  color: #409eff;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.id-text:hover {
+  text-decoration: underline;
 }
 </style>

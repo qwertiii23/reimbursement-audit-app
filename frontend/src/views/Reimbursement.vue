@@ -9,26 +9,51 @@
     </div>
 
     <el-card class="filter-card">
-      <el-form :inline="true" :model="filters">
+      <el-form :inline="true" :model="filters" class="filter-form">
+        <el-form-item label="标题">
+          <el-input v-model="filters.title" placeholder="请输入标题" clearable style="width: 200px;" />
+        </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="filters.status" placeholder="全部状态" clearable>
+          <el-select v-model="filters.status" placeholder="请选择状态" clearable style="width: 150px;">
             <el-option label="待提交" value="pending_submission" />
             <el-option label="待审核" value="pending" />
             <el-option label="审核中" value="auditing" />
             <el-option label="已通过" value="approved" />
-            <el-option label="已驳回" value="rejected" />
+            <el-option label="已拒绝" value="rejected" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="loadReimbursements">查询</el-button>
-          <el-button @click="resetFilters">重置</el-button>
+        <el-form-item label="创建时间">
+          <el-date-picker
+            v-model="filters.dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            style="width: 300px;"
+            @change="handleDateChange"
+          />
+          <el-button type="primary" @click="loadReimbursements" style="margin-left: 10px;">
+            <el-icon><Search /></el-icon>
+            查询
+          </el-button>
+          <el-button @click="resetFilters" style="margin-left: 10px;">
+            <el-icon><Refresh /></el-icon>
+            重置
+          </el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <el-card class="table-card">
       <el-table :data="reimbursements" v-loading="loading" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="id" label="ID" width="200">
+          <template #default="{ row }">
+            <el-tooltip :content="row.id" placement="top">
+              <span class="id-text">{{ row.id.substring(0, 12) }}...</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
         <el-table-column prop="title" label="标题" min-width="150" />
         <el-table-column prop="total_amount" label="金额" width="120">
           <template #default="{ row }">
@@ -49,7 +74,13 @@
             <el-button type="primary" link size="small" @click="viewDetail(row.id)">
               查看
             </el-button>
-            <el-button type="primary" link size="small" @click="editReimbursement(row.id)">
+            <el-button
+              v-if="row.status === 'pending_submission'"
+              type="primary"
+              link
+              size="small"
+              @click="editReimbursement(row.id)"
+            >
               编辑
             </el-button>
             <el-button
@@ -166,6 +197,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getReimbursementsByUser, getAllReimbursements, uploadReimbursement, uploadInvoice } from '@/api/reimbursement'
 import { startAudit as startAuditApi } from '@/api/audit'
@@ -184,7 +216,9 @@ const currentReimbursementId = ref('')
 const reimbursements = ref([])
 
 const filters = reactive({
-  status: ''
+  title: '',
+  status: '',
+  dateRange: []
 })
 
 const pagination = reactive({
@@ -248,17 +282,32 @@ const getStatusText = (status) => {
 const loadReimbursements = async () => {
   loading.value = true
   try {
+    const params = {}
+    
+    if (filters.title) {
+      params.title = filters.title
+    }
+    if (filters.status) {
+      params.status = filters.status
+    }
+    if (filters.dateRange && filters.dateRange.length === 2) {
+      params.start_date = filters.dateRange[0]
+      params.end_date = filters.dateRange[1]
+    }
+
     let response
     if (userStore.user.role === 'admin') {
       response = await getAllReimbursements(
         pagination.page,
-        pagination.pageSize
+        pagination.pageSize,
+        params
       )
     } else {
       response = await getReimbursementsByUser(
         userStore.user.id,
         pagination.page,
-        pagination.pageSize
+        pagination.pageSize,
+        params
       )
     }
     reimbursements.value = response.data?.list || []
@@ -271,8 +320,18 @@ const loadReimbursements = async () => {
 }
 
 const resetFilters = () => {
+  filters.title = ''
   filters.status = ''
+  filters.dateRange = []
   pagination.page = 1
+  loadReimbursements()
+}
+
+const handleFilterClear = () => {
+  loadReimbursements()
+}
+
+const handleDateChange = () => {
   loadReimbursements()
 }
 
@@ -384,6 +443,40 @@ onMounted(() => {
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   margin-bottom: 20px;
+}
+
+.filter-card :deep(.el-card__body) {
+  padding: 24px;
+}
+
+.filter-card :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.filter-card :deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.filter-card :deep(.el-input__wrapper),
+.filter-card :deep(.el-select) {
+  width: 100%;
+}
+
+.filter-card :deep(.el-button) {
+  padding: 10px 20px;
+  font-weight: 500;
+}
+
+.id-text {
+  cursor: pointer;
+  color: #409eff;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.id-text:hover {
+  text-decoration: underline;
 }
 
 .pagination {

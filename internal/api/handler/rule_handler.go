@@ -114,11 +114,12 @@ func (h *RuleHandler) GetRules(c *gin.Context) {
 
 	filter := &rule.RuleFilter{
 		RuleCode: c.Query("rule_code"),
-		Type:     c.Query("type"),
-		Category: c.Query("category"),
-		Status:   c.Query("status"),
-		Page:     1,
-		Size:     10,
+		Name:      c.Query("name"),
+		Type:      c.Query("type"),
+		Category:   c.Query("category"),
+		Status:     c.Query("status"),
+		Page:       1,
+		Size:       10,
 	}
 
 	if page := c.Query("page"); page != "" {

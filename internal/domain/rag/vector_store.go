@@ -104,6 +104,10 @@ type VectorStore struct {
 	logger logger.Logger
 }
 
+func (vs *VectorStore) GetDB() *gorm.DB {
+	return vs.db
+}
+
 // NewVectorStore 创建向量存储实例
 func NewVectorStore(dsn string, log logger.Logger) (*VectorStore, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{

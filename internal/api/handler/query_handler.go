@@ -81,12 +81,21 @@ func (h *QueryHandler) GetReimbursementsByUserID(c *gin.Context) {
 		size = 10
 	}
 
+	title := c.Query("title")
+	status := c.Query("status")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
 	h.logger.WithContext(c.Request.Context()).Info("根据用户ID查询报销单列表",
 		logger.NewField("user_id", userID),
 		logger.NewField("page", page),
-		logger.NewField("size", size))
+		logger.NewField("size", size),
+		logger.NewField("title", title),
+		logger.NewField("status", status),
+		logger.NewField("start_date", startDate),
+		logger.NewField("end_date", endDate))
 
-	reimbursements, total, err := h.reimbursementRepo.ListReimbursementsByUserID(c.Request.Context(), userID, page, size)
+	reimbursements, total, err := h.reimbursementRepo.ListReimbursementsByUserIDWithFilters(c.Request.Context(), userID, page, size, title, status, startDate, endDate)
 	if err != nil {
 		h.logger.WithContext(c.Request.Context()).Error("查询报销单列表失败",
 			logger.NewField("error", err.Error()),
@@ -115,11 +124,20 @@ func (h *QueryHandler) GetAllReimbursements(c *gin.Context) {
 		size = 10
 	}
 
+	title := c.Query("title")
+	status := c.Query("status")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
 	h.logger.WithContext(c.Request.Context()).Info("获取所有报销单列表",
 		logger.NewField("page", page),
-		logger.NewField("size", size))
+		logger.NewField("size", size),
+		logger.NewField("title", title),
+		logger.NewField("status", status),
+		logger.NewField("start_date", startDate),
+		logger.NewField("end_date", endDate))
 
-	reimbursements, total, err := h.reimbursementRepo.ListAllReimbursements(c.Request.Context(), page, size)
+	reimbursements, total, err := h.reimbursementRepo.ListAllReimbursementsWithFilters(c.Request.Context(), page, size, title, status, startDate, endDate)
 	if err != nil {
 		h.logger.WithContext(c.Request.Context()).Error("查询报销单列表失败",
 			logger.NewField("error", err.Error()))

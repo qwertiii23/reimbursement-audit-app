@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-export const getRules = (params) => {
+export const getRules = (params = {}) => {
   return request({
     url: '/rules',
     method: 'get',
@@ -42,5 +42,13 @@ export const disableRule = (id) => {
   return request({
     url: `/rules/${id}/disable`,
     method: 'patch'
+  })
+}
+
+export const testRule = (id, data) => {
+  return request({
+    url: `/rules/${id}/test`,
+    method: 'post',
+    data
   })
 }

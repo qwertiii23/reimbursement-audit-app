@@ -172,6 +172,52 @@ func (r *ReimbursementRepository) ListReimbursementsByUserID(ctx context.Context
 	return reimbursements, total, nil
 }
 
+// ListReimbursementsByUserIDWithFilters 根据用户ID和筛选条件获取报销单列表
+func (r *ReimbursementRepository) ListReimbursementsByUserIDWithFilters(ctx context.Context, userID string, page, size int, title, status, startDate, endDate string) ([]*reimbursement.Reimbursement, int64, error) {
+	query := r.client.GetDB().WithContext(ctx).Model(&reimbursement.Reimbursement{}).Where("user_id = ?", userID)
+
+	if title != "" {
+		query = query.Where("title LIKE ?", "%"+title+"%")
+	}
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if startDate != "" && endDate != "" {
+		query = query.Where("created_at BETWEEN ? AND ?", startDate, endDate)
+	}
+
+	var total int64
+	countResult := query.Count(&total)
+	if countResult.Error != nil {
+		r.logger.WithContext(ctx).Error("获取报销单总数失败",
+			logger.NewField("error", countResult.Error.Error()),
+			logger.NewField("user_id", userID),
+			logger.NewField("title", title),
+			logger.NewField("status", status),
+			logger.NewField("start_date", startDate),
+			logger.NewField("end_date", endDate))
+		return nil, 0, countResult.Error
+	}
+
+	offset := (page - 1) * size
+	var reimbursements []*reimbursement.Reimbursement
+	result := query.Order("created_at DESC").
+		Limit(size).
+		Offset(offset).
+		Find(&reimbursements)
+
+	if result.Error != nil {
+		r.logger.WithContext(ctx).Error("获取报销单列表失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("user_id", userID),
+			logger.NewField("page", page),
+			logger.NewField("size", size))
+		return nil, 0, result.Error
+	}
+
+	return reimbursements, total, nil
+}
+
 // ListReimbursementsByDateRange 根据日期范围获取报销单列表
 func (r *ReimbursementRepository) ListReimbursementsByDateRange(ctx context.Context, startDate, endDate string, page, size int) ([]*reimbursement.Reimbursement, int64, error) {
 	// 获取总数
@@ -269,6 +315,50 @@ func (r *ReimbursementRepository) ListAllReimbursements(ctx context.Context, pag
 	var reimbursements []*reimbursement.Reimbursement
 	result := r.client.GetDB().WithContext(ctx).
 		Order("created_at DESC").
+		Limit(size).
+		Offset(offset).
+		Find(&reimbursements)
+
+	if result.Error != nil {
+		r.logger.WithContext(ctx).Error("获取报销单列表失败",
+			logger.NewField("error", result.Error.Error()),
+			logger.NewField("page", page),
+			logger.NewField("size", size))
+		return nil, 0, result.Error
+	}
+
+	return reimbursements, total, nil
+}
+
+// ListAllReimbursementsWithFilters 获取所有报销单列表（管理员使用，支持筛选）
+func (r *ReimbursementRepository) ListAllReimbursementsWithFilters(ctx context.Context, page, size int, title, status, startDate, endDate string) ([]*reimbursement.Reimbursement, int64, error) {
+	query := r.client.GetDB().WithContext(ctx).Model(&reimbursement.Reimbursement{})
+
+	if title != "" {
+		query = query.Where("title LIKE ?", "%"+title+"%")
+	}
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if startDate != "" && endDate != "" {
+		query = query.Where("created_at BETWEEN ? AND ?", startDate, endDate)
+	}
+
+	var total int64
+	countResult := query.Count(&total)
+	if countResult.Error != nil {
+		r.logger.WithContext(ctx).Error("获取报销单总数失败",
+			logger.NewField("error", countResult.Error.Error()),
+			logger.NewField("title", title),
+			logger.NewField("status", status),
+			logger.NewField("start_date", startDate),
+			logger.NewField("end_date", endDate))
+		return nil, 0, countResult.Error
+	}
+
+	offset := (page - 1) * size
+	var reimbursements []*reimbursement.Reimbursement
+	result := query.Order("created_at DESC").
 		Limit(size).
 		Offset(offset).
 		Find(&reimbursements)

@@ -29,6 +29,10 @@
             <el-icon><Setting /></el-icon>
             <span>规则管理</span>
           </el-menu-item>
+          <el-menu-item index="/knowledge">
+            <el-icon><Folder /></el-icon>
+            <span>知识库</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
       <el-container>
@@ -69,6 +73,14 @@
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  Odometer,
+  Document,
+  Checked,
+  Setting,
+  Folder,
+  ArrowDown
+} from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()

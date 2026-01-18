@@ -191,6 +191,9 @@ func (r *RuleRepository) ListRules(ctx context.Context, filter *rule.RuleFilter)
 		if filter.RuleCode != "" {
 			db = db.Where("rule_code LIKE ?", "%"+filter.RuleCode+"%")
 		}
+		if filter.Name != "" {
+			db = db.Where("name LIKE ?", "%"+filter.Name+"%")
+		}
 		if filter.Type != "" {
 			db = db.Where("type = ?", filter.Type)
 		}

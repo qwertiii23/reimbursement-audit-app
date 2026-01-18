@@ -1,18 +1,18 @@
 import request from '@/utils/request'
 
-export const getReimbursementsByUser = (userId, page = 1, pageSize = 10) => {
+export const getReimbursementsByUser = (userId, page = 1, pageSize = 10, params = {}) => {
   return request({
     url: '/reimbursements/user',
     method: 'get',
-    params: { user_id: userId, page, page_size: pageSize }
+    params: { user_id: userId, page, page_size: pageSize, ...params }
   })
 }
 
-export const getAllReimbursements = (page = 1, pageSize = 10) => {
+export const getAllReimbursements = (page = 1, pageSize = 10, params = {}) => {
   return request({
     url: '/reimbursements/all',
     method: 'get',
-    params: { page, size: pageSize }
+    params: { page, page_size: pageSize, ...params }
   })
 }
 

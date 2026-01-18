@@ -96,6 +96,7 @@ type RuleValidationResult struct {
 // RuleFilter 规则过滤器模型
 type RuleFilter struct {
 	RuleCode string   `json:"rule_code"` // 规则编码
+	Name     string   `json:"name"`      // 规则名称
 	Type     string   `json:"type"`      // 规则类型
 	Category string   `json:"category"`  // 规则分类
 	Status   string   `json:"status"`    // 规则状态

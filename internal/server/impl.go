@@ -11,6 +11,7 @@ import (
 	"reimbursement-audit/internal/application/service"
 	"reimbursement-audit/internal/config"
 	"reimbursement-audit/internal/domain/audit"
+	"reimbursement-audit/internal/domain/knowledge"
 	"reimbursement-audit/internal/domain/ocr"
 	"reimbursement-audit/internal/domain/ocr/provider"
 	"reimbursement-audit/internal/domain/rag"
@@ -18,6 +19,7 @@ import (
 	"reimbursement-audit/internal/domain/rule"
 	"reimbursement-audit/internal/domain/user"
 	storage "reimbursement-audit/internal/infra/storage/file"
+	filestorage "reimbursement-audit/internal/infra/storage/filestorage"
 	mysqlRepo "reimbursement-audit/internal/infra/storage/mysql"
 	"reimbursement-audit/internal/pkg/logger"
 
@@ -235,7 +237,16 @@ func (s *serverImpl) RegisterRoutes() {
 	userRepo := mysqlRepo.NewUserRepository(mysqlClient, loggerInstance)
 	userService := user.NewUserService(userRepo, loggerInstance)
 
+	fileStorageRepo := filestorage.NewKnowledgeRepository("./docs", loggerInstance)
+	knowledgeService := knowledge.NewKnowledgeService(fileStorageRepo, userRepo)
+
 	ragService := rag.NewRAGService(loggerInstance, llmClient, documentProcessor, vectorStore, promptBuilder)
+
+	// 创建知识库处理器
+	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeService)
+
+	// 注册知识库相关路由
+	knowledgeHandler.RegisterRoutes(s.engine)
 
 	// 创建审核仓储和审核服务
 	auditRepo := mysqlRepo.NewAuditRepository(mysqlClient, loggerInstance)
