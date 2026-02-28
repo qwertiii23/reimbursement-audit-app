@@ -22,7 +22,7 @@ database:
   host: "localhost"
   port: 3306
   username: "root"
-  password: "Ljq20040811."
+  password: ""  # 从环境变量获取
   dbname: "reimbursement_audit"
   charset: "utf8mb4"
   collation: "utf8mb4_unicode_ci"

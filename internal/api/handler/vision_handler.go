@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"reimbursement-audit/internal/api/middleware"
 	"reimbursement-audit/internal/api/response"
 	"reimbursement-audit/internal/pkg/logger"
@@ -93,7 +94,10 @@ func (h *VisionHandler) callVisionAPI(ctx context.Context, imageData []byte, pro
 	base64Image := base64.StdEncoding.EncodeToString(imageData)
 
 	apiURL := "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-	apiKey := "d1f2189e1e6c45fbb522481a0f32437c.tvBH9rduuRgWgxEu"
+	apiKey := os.Getenv("GLM_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("GLM_API_KEY环境变量未设置")
+	}
 
 	payload := map[string]interface{}{
 		"model": "glm-4v",
