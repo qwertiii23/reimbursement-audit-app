@@ -15,9 +15,9 @@
             <el-icon><Checked /></el-icon>
             待审核
           </el-button>
-          <el-button type="info" size="small" @click="$router.push('/rules')" v-if="isAdmin">
+          <el-button type="info" size="small" @click="$router.push('/rule-engine')" v-if="isAdmin">
             <el-icon><Setting /></el-icon>
-            规则管理
+            规则引擎管理
           </el-button>
         </div>
       </div>

@@ -64,10 +64,10 @@ const routes = [
         meta: { title: '流程日志' }
       },
       {
-        path: 'rules',
-        name: 'Rules',
-        component: () => import('@/views/RuleManagement.vue'),
-        meta: { title: '规则管理', requiresAdmin: true }
+        path: 'rule-engine',
+        name: 'RuleEngine',
+        component: () => import('@/views/RuleEngineManagement.vue'),
+        meta: { title: '规则引擎管理', requiresAdmin: true }
       },
       {
         path: 'knowledge',

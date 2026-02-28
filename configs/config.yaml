@@ -44,7 +44,7 @@ postgres:
 
 # 日志配置
 logger:
-  level: "info"  # debug, info, warn, error, fatal
+  level: "debug"  # debug, info, warn, error, fatal
   format: "json"  # json, text
   output: "stdout"  # stdout, stderr, file
   filename: "logs/app.log"

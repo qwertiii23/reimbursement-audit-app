@@ -25,9 +25,9 @@
             <el-icon><Checked /></el-icon>
             <span>审核管理</span>
           </el-menu-item>
-          <el-menu-item v-if="isAdmin" index="/rules">
+          <el-menu-item v-if="isAdmin" index="/rule-engine">
             <el-icon><Setting /></el-icon>
-            <span>规则管理</span>
+            <span>规则引擎管理</span>
           </el-menu-item>
           <el-menu-item index="/knowledge">
             <el-icon><Folder /></el-icon>

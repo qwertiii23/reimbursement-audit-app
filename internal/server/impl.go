@@ -11,12 +11,13 @@ import (
 	"reimbursement-audit/internal/application/service"
 	"reimbursement-audit/internal/config"
 	"reimbursement-audit/internal/domain/audit"
+	"reimbursement-audit/internal/domain/featurefunction"
 	"reimbursement-audit/internal/domain/knowledge"
 	"reimbursement-audit/internal/domain/ocr"
 	"reimbursement-audit/internal/domain/ocr/provider"
 	"reimbursement-audit/internal/domain/rag"
 	"reimbursement-audit/internal/domain/reimbursement"
-	"reimbursement-audit/internal/domain/rule"
+	ruleenginedomain "reimbursement-audit/internal/domain/ruleengine"
 	"reimbursement-audit/internal/domain/user"
 	storage "reimbursement-audit/internal/infra/storage/file"
 	filestorage "reimbursement-audit/internal/infra/storage/filestorage"
@@ -191,16 +192,94 @@ func (s *serverImpl) RegisterRoutes() {
 		loggerInstance,
 	)
 
-	// 创建规则仓储和规则引擎
-	ruleRepo := mysqlRepo.NewRuleRepository(mysqlClient, loggerInstance)
-	ruleEngine := rule.NewGRuleEngine(ruleRepo, loggerInstance)
+	// 创建特征函数注册表
+	featureFunctionRegistry := featurefunction.NewFunctionRegistry()
+
+	// 注册内置特征函数
+	detectPhotoshopFn := featurefunction.NewDetectPhotoshopFunction()
+	if err := featureFunctionRegistry.Register(detectPhotoshopFn); err != nil {
+		loggerInstance.Error("注册P图检测特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	imageQualityFn := featurefunction.NewImageQualityFunction()
+	if err := featureFunctionRegistry.Register(imageQualityFn); err != nil {
+		loggerInstance.Error("注册图片质量检测特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	invoiceCodeLengthFn := featurefunction.NewInvoiceCodeLengthFunction()
+	if err := featureFunctionRegistry.Register(invoiceCodeLengthFn); err != nil {
+		loggerInstance.Error("注册发票代码长度检测特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	invoiceFraudDetectionFn := featurefunction.NewInvoiceFraudDetectionFunction()
+	invoiceFraudDetectionFn.SetLogger(loggerInstance)
+	if err := featureFunctionRegistry.Register(invoiceFraudDetectionFn); err != nil {
+		loggerInstance.Error("注册发票舞弊检测特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	// 创建规则引擎仓储
+	ruleEngineRepo := mysqlRepo.NewRuleEngineRepository(mysqlClient, loggerInstance)
+
+	// 创建规则引擎
+	ruleEngine := ruleenginedomain.NewEngine(nil, ruleEngineRepo, loggerInstance, featureFunctionRegistry)
+
+	// 设置规则引擎的仓储
+	ruleEngine.SetRepository(ruleEngineRepo)
 
 	// 初始化规则引擎
 	if err := ruleEngine.Initialize(ctx); err != nil {
 		loggerInstance.Error("规则引擎初始化失败", logger.NewField("error", err.Error()))
 	}
 
-	ruleService := rule.NewRuleService(ruleRepo, loggerInstance, ruleEngine)
+	ruleEngineService := ruleenginedomain.NewRuleEngineService(
+		ruleEngineRepo,
+		ruleEngineRepo,
+		ruleEngineRepo,
+		ruleEngineRepo,
+		ruleEngineRepo,
+		featureFunctionRegistry,
+		loggerInstance,
+	)
+
+	// 设置规则重新加载回调函数
+	ruleEngineService.SetReloadCallback(func(ctx context.Context) error {
+		return ruleEngine.Reload(ctx)
+	})
+
+	// 设置规则引擎实例
+	ruleEngineService.SetEngine(ruleEngine)
+
+	// 创建规则引擎处理器
+	ruleEngineHandler := handler.NewRuleEngineHandler(ruleEngineService)
+
+	// 创建特征函数服务
+	featureFunctionService := ruleenginedomain.NewFeatureFunctionService(
+		featureFunctionRegistry,
+		loggerInstance,
+	)
+
+	// 创建特征函数处理器
+	featureFunctionHandler := handler.NewFeatureFunctionHandler(featureFunctionService)
+
+	// 创建视觉分析处理器
+	visionHandler := handler.NewVisionHandler(loggerInstance)
+
+	// 注册规则引擎相关路由
+	s.engine.POST("/api/v1/engine/rules", ruleEngineHandler.CreateRule)
+	s.engine.PUT("/api/v1/engine/rules/:id", ruleEngineHandler.UpdateRule)
+	s.engine.DELETE("/api/v1/engine/rules/:id", ruleEngineHandler.DeleteRule)
+	s.engine.PUT("/api/v1/engine/rules/:id/toggle", ruleEngineHandler.ToggleRuleStatus)
+	s.engine.GET("/api/v1/engine/rules", ruleEngineHandler.GetRules)
+	s.engine.GET("/api/v1/engine/rules/:id", ruleEngineHandler.GetRuleByID)
+	s.engine.POST("/api/v1/engine/test", ruleEngineHandler.TestRules)
+	s.engine.GET("/api/v1/engine/features", ruleEngineHandler.GetFeatures)
+
+	// 注册特征函数相关路由
+	s.engine.GET("/api/v1/engine/functions", featureFunctionHandler.ListFunctions)
+	s.engine.GET("/api/v1/engine/functions/:name/schema", featureFunctionHandler.GetFunctionSchema)
+
+	// 注册视觉分析相关路由
+	s.engine.POST("/api/v1/vision/analyze", visionHandler.Analyze)
 
 	// 创建RAG服务
 	llmClient := rag.NewLLMClientWithEmbedding(
@@ -250,7 +329,7 @@ func (s *serverImpl) RegisterRoutes() {
 
 	// 创建审核仓储和审核服务
 	auditRepo := mysqlRepo.NewAuditRepository(mysqlClient, loggerInstance)
-	auditDomainService := audit.NewService(auditRepo, reimbursementRepo, ruleService, ragService, loggerInstance)
+	auditDomainService := audit.NewService(auditRepo, reimbursementRepo, ruleEngineService, ragService, loggerInstance)
 	auditAppService := service.NewAuditApplicationService(auditDomainService, loggerInstance)
 
 	// 创建上传处理器
@@ -272,18 +351,6 @@ func (s *serverImpl) RegisterRoutes() {
 	s.engine.GET("/api/v1/audit/:id/result", auditHandler.GetAuditResult)
 	s.engine.POST("/api/v1/audit/:id/retry", auditHandler.RetryAudit)
 	s.engine.POST("/api/v1/audit/:id/withdraw", auditHandler.WithdrawAudit)
-
-	// 创建规则处理器
-	ruleHandler := handler.NewRuleHandler(ruleService)
-
-	// 注册规则相关路由
-	s.engine.POST("/api/v1/rules", ruleHandler.CreateRule)
-	s.engine.PUT("/api/v1/rules/:id", ruleHandler.UpdateRule)
-	s.engine.DELETE("/api/v1/rules/:id", ruleHandler.DeleteRule)
-	s.engine.GET("/api/v1/rules", ruleHandler.GetRules)
-	s.engine.PATCH("/api/v1/rules/:id/enable", ruleHandler.EnableRule)
-	s.engine.PATCH("/api/v1/rules/:id/disable", ruleHandler.DisableRule)
-	s.engine.POST("/api/v1/rules/:id/test", ruleHandler.TestRule)
 
 	userHandler := handler.NewUserHandler(userService)
 

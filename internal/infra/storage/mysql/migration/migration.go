@@ -15,7 +15,7 @@ import (
 
 	"reimbursement-audit/internal/domain/ocr"
 	"reimbursement-audit/internal/domain/reimbursement"
-	"reimbursement-audit/internal/domain/rule"
+	ruleenginedomain "reimbursement-audit/internal/domain/ruleengine"
 	"reimbursement-audit/internal/infra/storage/mysql"
 
 	"gorm.io/gorm"
@@ -51,7 +51,11 @@ func (m *MigrationManager) Up(ctx context.Context) error {
 		&reimbursement.Reimbursement{},
 		&ocr.Invoice{},
 		// 规则相关模型
-		&rule.Rule{},
+		&ruleenginedomain.Rule{},
+		&ruleenginedomain.Condition{},
+		&ruleenginedomain.Decision{},
+		&ruleenginedomain.Feature{},
+		&ruleenginedomain.FeatureValue{},
 		// &reimbursement.AuditResult{},
 		// &reimbursement.AuditStatus{},
 	)

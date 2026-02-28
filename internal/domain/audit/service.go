@@ -8,7 +8,7 @@ import (
 
 	"reimbursement-audit/internal/domain/rag"
 	"reimbursement-audit/internal/domain/reimbursement"
-	"reimbursement-audit/internal/domain/rule"
+	ruleenginedomain "reimbursement-audit/internal/domain/ruleengine"
 	"reimbursement-audit/internal/pkg/logger"
 
 	"github.com/google/uuid"
@@ -18,7 +18,7 @@ import (
 type Service struct {
 	repo              Repository
 	reimbursementRepo reimbursement.Repository
-	ruleService       *rule.RuleService
+	ruleEngineService *ruleenginedomain.RuleEngineService
 	ragService        *rag.RAGService
 	logger            logger.Logger
 }
@@ -27,14 +27,14 @@ type Service struct {
 func NewService(
 	repo Repository,
 	reimbursementRepo reimbursement.Repository,
-	ruleService *rule.RuleService,
+	ruleEngineService *ruleenginedomain.RuleEngineService,
 	ragService *rag.RAGService,
 	logger logger.Logger,
 ) *Service {
 	return &Service{
 		repo:              repo,
 		reimbursementRepo: reimbursementRepo,
-		ruleService:       ruleService,
+		ruleEngineService: ruleEngineService,
 		ragService:        ragService,
 		logger:            logger,
 	}
@@ -326,15 +326,15 @@ func (s *Service) executeRuleValidation(ctx context.Context, reimbursement *reim
 			logger.NewField("发票ID", invoice.ID),
 			logger.NewField("发票号码", invoice.Number))
 
-		validationData := &rule.InvoiceValidationData{
-			Invoice:                       invoice,
-			Reimbursement:                 reimbursement,
-			ApplyDate:                     reimbursement.ApplyDate,
-			IsInvoiceDateOlderThan6Months: invoice.Date != nil && invoice.Date.Before(reimbursement.ApplyDate.AddDate(0, -6, 0)),
-			Price:                         invoice.Price,
+		validationData := map[string]interface{}{
+			"invoice":                             invoice,
+			"reimbursement":                       reimbursement,
+			"apply_date":                          reimbursement.ApplyDate,
+			"is_invoice_date_older_than_6_months": invoice.Date != nil && invoice.Date.Before(reimbursement.ApplyDate.AddDate(0, -6, 0)),
+			"price":                               invoice.Price,
 		}
 
-		results, err := s.ruleService.ValidateAllRules(ctx, validationData)
+		results, err := s.ruleEngineService.ExecuteAllRules(ctx, validationData)
 		if err != nil {
 			s.logger.WithContext(ctx).Error("规则校验失败",
 				logger.NewField("发票ID", invoice.ID),
