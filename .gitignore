@@ -1,0 +1,46 @@
+# 敏感配置文件
+configs/config.dev.yaml
+configs/config.prod.yaml
+configs/config.yaml
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 日志文件
+logs/
+*.log
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# 上传文件
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 测试覆盖率
+coverage/
+*.coverprofile
+coverage.html
+
+# 本地安全记录文件（不提交到Git）
+SECURITY_RISKS.md
+.env.example
