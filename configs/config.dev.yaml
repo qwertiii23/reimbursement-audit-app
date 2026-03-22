@@ -22,7 +22,7 @@ database:
   host: "localhost"
   port: 3306
   username: "root"
-  password: "${DB_PASSWORD}"
+  password: "Ljq20040811."
   dbname: "reimbursement_audit"
   charset: "utf8mb4"
   collation: "utf8mb4_unicode_ci"
@@ -65,8 +65,8 @@ storage:
 # OCR配置
 ocr:
   provider: "tencent"
-  secret_id: "${TENCENT_OCR_SECRET_ID}"  # 从环境变量获取
-  secret_key: "${TENCENT_OCR_SECRET_KEY}"  # 从环境变量获取
+  secret_id: "AKID6FPOExZ3NB2471tZ5bxAC4kFZgcNyNab"
+  secret_key: "98xc7TedT9dv0tc9T2QcvAJNM995qRq"
   region: "ap-beijing"
   timeout: 30
   max_retries: 3
@@ -74,7 +74,7 @@ ocr:
 # LLM配置
 llm:
   provider: "deepseek"
-  api_key: "${DEEPSEEK_API_KEY}"  # 从环境变量获取
+  api_key: "sk-61bb8de8c1234a368c3cb5e3609b2d20"
   base_url: "https://api.deepseek.com/v1"
   model: "deepseek-chat"
   max_tokens: 2000
