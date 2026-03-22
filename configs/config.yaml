@@ -22,7 +22,7 @@ database:
   host: "localhost"
   port: 3306
   username: "root"
-  password: "password"
+  password: ""  # 从环境变量获取
   dbname: "reimbursement_audit"
   charset: "utf8mb4"
   collation: "utf8mb4_unicode_ci"
@@ -33,9 +33,18 @@ database:
   conn_max_lifetime: 1h
   conn_max_idle_time: 10m
 
+# PostgreSQL配置（用于向量存储）
+postgres:
+  host: "localhost"
+  port: 5432
+  username: "postgres"
+  password: ""
+  dbname: "reimbursement_audit"
+  sslmode: "disable"
+
 # 日志配置
 logger:
-  level: "info"  # debug, info, warn, error, fatal
+  level: "debug"  # debug, info, warn, error, fatal
   format: "json"  # json, text
   output: "stdout"  # stdout, stderr, file
   filename: "logs/app.log"

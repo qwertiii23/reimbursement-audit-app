@@ -7,48 +7,51 @@ import (
 
 // AuditResponse 审核响应
 type AuditResponse struct {
-	ID              string                 `json:"id"`
-	ReimbursementID string                 `json:"reimbursement_id"`
-	Status          string                 `json:"status"`
-	RulePass        bool                   `json:"rule_pass"`
-	RAGPass         bool                   `json:"rag_pass"`
-	FinalPass       bool                   `json:"final_pass"`
-	RiskLevel       string                 `json:"risk_level"`
-	RiskScore       float64                `json:"risk_score"`
-	Reason          string                 `json:"reason"`
-	Suggestions     []string               `json:"suggestions"`
-	StartedAt       time.Time              `json:"started_at"`
-	CompletedAt     *time.Time             `json:"completed_at"`
-	Duration        int64                  `json:"duration"`
+	ID              string     `json:"id"`
+	ReimbursementID string     `json:"reimbursement_id"`
+	Status          string     `json:"status"`
+	WorkflowStatus  string     `json:"workflow_status"`
+	RulePass        bool       `json:"rule_pass"`
+	RAGPass         bool       `json:"rag_pass"`
+	FinalPass       bool       `json:"final_pass"`
+	RiskLevel       string     `json:"risk_level"`
+	RiskScore       float64    `json:"risk_score"`
+	Reason          string     `json:"reason"`
+	Suggestions     []string   `json:"suggestions"`
+	StartedAt       time.Time  `json:"started_at"`
+	CompletedAt     *time.Time `json:"completed_at"`
+	Duration        int64      `json:"duration"`
 }
 
 // AuditStatusResponse 审核状态响应
 type AuditStatusResponse struct {
-	ID              string    `json:"id"`
-	ReimbursementID string    `json:"reimbursement_id"`
-	Status          string    `json:"status"`
-	StartedAt       time.Time `json:"started_at"`
+	ID              string     `json:"id"`
+	ReimbursementID string     `json:"reimbursement_id"`
+	Status          string     `json:"status"`
+	WorkflowStatus  string     `json:"workflow_status"`
+	StartedAt       time.Time  `json:"started_at"`
 	CompletedAt     *time.Time `json:"completed_at"`
-	Duration        int64     `json:"duration"`
+	Duration        int64      `json:"duration"`
 }
 
 // AuditResultResponse 审核结果响应
 type AuditResultResponse struct {
-	ID              string                      `json:"id"`
-	ReimbursementID string                      `json:"reimbursement_id"`
-	Status          string                      `json:"status"`
-	RulePass        bool                        `json:"rule_pass"`
-	RAGPass         bool                        `json:"rag_pass"`
-	FinalPass       bool                        `json:"final_pass"`
-	RuleResults     []*RuleValidationResult     `json:"rule_results"`
+	ID              string                     `json:"id"`
+	ReimbursementID string                     `json:"reimbursement_id"`
+	Status          string                     `json:"status"`
+	WorkflowStatus  string                     `json:"workflow_status"`
+	RulePass        bool                       `json:"rule_pass"`
+	RAGPass         bool                       `json:"rag_pass"`
+	FinalPass       bool                       `json:"final_pass"`
+	RuleResults     []*RuleValidationResult    `json:"rule_results"`
 	RAGResults      *RAGAnalysisResultResponse `json:"rag_results"`
-	RiskLevel       string                      `json:"risk_level"`
-	RiskScore       float64                     `json:"risk_score"`
-	Reason          string                      `json:"reason"`
-	Suggestions     []string                    `json:"suggestions"`
-	StartedAt       time.Time                   `json:"started_at"`
-	CompletedAt     *time.Time                  `json:"completed_at"`
-	Duration        int64                       `json:"duration"`
+	RiskLevel       string                     `json:"risk_level"`
+	RiskScore       float64                    `json:"risk_score"`
+	Reason          string                     `json:"reason"`
+	Suggestions     []string                   `json:"suggestions"`
+	StartedAt       time.Time                  `json:"started_at"`
+	CompletedAt     *time.Time                 `json:"completed_at"`
+	Duration        int64                      `json:"duration"`
 }
 
 // RuleValidationResult 规则校验结果响应
@@ -65,12 +68,12 @@ type RuleValidationResult struct {
 
 // RAGAnalysisResultResponse RAG分析结果响应
 type RAGAnalysisResultResponse struct {
-	Query         string               `json:"query"`
-	Content       string               `json:"content"`
-	Confidence    float64              `json:"confidence"`
-	References    []*VectorReference   `json:"references"`
-	Analysis      string               `json:"analysis"`
-	ExecutionTime int64                `json:"execution_time"`
+	Query         string             `json:"query"`
+	Content       string             `json:"content"`
+	Confidence    float64            `json:"confidence"`
+	References    []*VectorReference `json:"references"`
+	Analysis      string             `json:"analysis"`
+	ExecutionTime int64              `json:"execution_time"`
 }
 
 // VectorReference 向量检索引用响应
@@ -88,6 +91,7 @@ func NewAuditResponse(auditResult *audit.AuditResult) *AuditResponse {
 		ID:              auditResult.ID,
 		ReimbursementID: auditResult.ReimbursementID,
 		Status:          string(auditResult.Status),
+		WorkflowStatus:  string(auditResult.WorkflowStatus),
 		RulePass:        auditResult.RulePass,
 		RAGPass:         auditResult.RAGPass,
 		FinalPass:       auditResult.FinalPass,
@@ -107,6 +111,7 @@ func NewAuditStatusResponse(auditResult *audit.AuditResult) *AuditStatusResponse
 		ID:              auditResult.ID,
 		ReimbursementID: auditResult.ReimbursementID,
 		Status:          string(auditResult.Status),
+		WorkflowStatus:  string(auditResult.WorkflowStatus),
 		StartedAt:       auditResult.StartedAt,
 		CompletedAt:     auditResult.CompletedAt,
 		Duration:        auditResult.Duration,
@@ -119,6 +124,7 @@ func NewAuditResultResponse(auditResult *audit.AuditResult) *AuditResultResponse
 		ID:              auditResult.ID,
 		ReimbursementID: auditResult.ReimbursementID,
 		Status:          string(auditResult.Status),
+		WorkflowStatus:  string(auditResult.WorkflowStatus),
 		RulePass:        auditResult.RulePass,
 		RAGPass:         auditResult.RAGPass,
 		FinalPass:       auditResult.FinalPass,
@@ -171,4 +177,38 @@ func NewAuditResultResponse(auditResult *audit.AuditResult) *AuditResultResponse
 	}
 
 	return response
+}
+
+// FlowLogResponse 流程日志响应
+type FlowLogResponse struct {
+	ID              string    `json:"id"`
+	ReimbursementID string    `json:"reimbursement_id"`
+	AuditID         string    `json:"audit_id"`
+	FlowStatus      string    `json:"flow_status"`
+	FlowType        string    `json:"flow_type"`
+	OperatorID      *string   `json:"operator_id"`
+	OperatorName    *string   `json:"operator_name"`
+	Action          string    `json:"action"`
+	Reason          *string   `json:"reason"`
+	Result          *string   `json:"result"`
+	IPAddress       *string   `json:"ip_address"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// NewFlowLogResponse 创建流程日志响应
+func NewFlowLogResponse(flowLog *audit.AuditFlowLog) *FlowLogResponse {
+	return &FlowLogResponse{
+		ID:              flowLog.ID,
+		ReimbursementID: flowLog.ReimbursementID,
+		AuditID:         flowLog.AuditID,
+		FlowStatus:      string(flowLog.FlowStatus),
+		FlowType:        string(flowLog.FlowType),
+		OperatorID:      flowLog.OperatorID,
+		OperatorName:    flowLog.OperatorName,
+		Action:          string(flowLog.Action),
+		Reason:          flowLog.Reason,
+		Result:          flowLog.Result,
+		IPAddress:       flowLog.IPAddress,
+		CreatedAt:       flowLog.CreatedAt,
+	}
 }

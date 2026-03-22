@@ -21,6 +21,12 @@ type LLMClient struct {
 	httpClient *http.Client
 	timeout    time.Duration
 	logger     logger.Logger
+	// Embedding配置
+	embeddingProvider  string
+	embeddingModel     string
+	embeddingAPIKey    string
+	embeddingBaseURL   string
+	embeddingDimension int
 }
 
 // NewLLMClient 创建大模型客户端实例
@@ -34,6 +40,25 @@ func NewLLMClient(apiKey, baseURL, model string, timeout int, log logger.Logger)
 		},
 		timeout: time.Duration(timeout) * time.Second,
 		logger:  log,
+	}
+}
+
+// NewLLMClientWithEmbedding 创建大模型客户端实例（包含embedding配置）
+func NewLLMClientWithEmbedding(apiKey, baseURL, model string, timeout int, log logger.Logger, embeddingProvider, embeddingModel, embeddingAPIKey, embeddingBaseURL string, embeddingDimension int) *LLMClient {
+	return &LLMClient{
+		apiKey:  apiKey,
+		baseURL: baseURL,
+		model:   model,
+		httpClient: &http.Client{
+			Timeout: time.Duration(timeout) * time.Second,
+		},
+		timeout:            time.Duration(timeout) * time.Second,
+		logger:             log,
+		embeddingProvider:  embeddingProvider,
+		embeddingModel:     embeddingModel,
+		embeddingAPIKey:    embeddingAPIKey,
+		embeddingBaseURL:   embeddingBaseURL,
+		embeddingDimension: embeddingDimension,
 	}
 }
 
@@ -179,9 +204,46 @@ func calculateCost(tokens int) float64 {
 
 // GenerateEmbedding 生成向量嵌入
 func (c *LLMClient) GenerateEmbedding(ctx context.Context, text string) ([]float64, error) {
-	embeddingRequest := map[string]interface{}{
-		"model": "text-embedding-ada-002",
-		"input": text,
+	baseURL := c.embeddingBaseURL
+	if baseURL == "" {
+		baseURL = c.baseURL
+	}
+
+	apiKey := c.embeddingAPIKey
+	if apiKey == "" {
+		apiKey = c.apiKey
+	}
+
+	model := c.embeddingModel
+	if model == "" {
+		model = c.model
+	}
+
+	c.logger.Info("开始生成embedding",
+		logger.NewField("provider", c.embeddingProvider),
+		logger.NewField("baseURL", baseURL),
+		logger.NewField("model", model),
+		logger.NewField("text_length", len(text)),
+	)
+
+	var embeddingRequest map[string]interface{}
+	var endpoint string
+
+	if c.embeddingProvider == "zhipu" {
+		embeddingRequest = map[string]interface{}{
+			"model": model,
+			"input": []string{text},
+		}
+		if c.embeddingDimension > 0 {
+			embeddingRequest["dimensions"] = c.embeddingDimension
+		}
+		endpoint = "/embeddings"
+	} else {
+		embeddingRequest = map[string]interface{}{
+			"model": model,
+			"input": text,
+		}
+		endpoint = "/embeddings"
 	}
 
 	requestBody, err := json.Marshal(embeddingRequest)
@@ -190,18 +252,23 @@ func (c *LLMClient) GenerateEmbedding(ctx context.Context, text string) ([]float
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/embeddings", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", baseURL+endpoint, bytes.NewBuffer(requestBody))
 	if err != nil {
 		c.logger.Error("创建请求失败", logger.NewField("error", err))
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	c.logger.Info("发送embedding请求",
+		logger.NewField("url", baseURL+endpoint),
+		logger.NewField("request_body", string(requestBody)),
+	)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		c.logger.Error("发送请求失败", logger.NewField("url", c.baseURL), logger.NewField("error", err))
+		c.logger.Error("发送请求失败", logger.NewField("url", baseURL), logger.NewField("error", err))
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -212,6 +279,11 @@ func (c *LLMClient) GenerateEmbedding(ctx context.Context, text string) ([]float
 		return nil, err
 	}
 
+	c.logger.Info("收到embedding响应",
+		logger.NewField("status_code", resp.StatusCode),
+		logger.NewField("response_body", string(body)),
+	)
+
 	if resp.StatusCode != http.StatusOK {
 		c.logger.Error("请求失败", logger.NewField("status_code", resp.StatusCode), logger.NewField("response", string(body)))
 		return nil, errors.New("请求失败")
@@ -220,6 +292,7 @@ func (c *LLMClient) GenerateEmbedding(ctx context.Context, text string) ([]float
 	var embeddingResponse struct {
 		Data []struct {
 			Embedding []float64 `json:"embedding"`
+			Index     int       `json:"index"`
 		} `json:"data"`
 	}
 

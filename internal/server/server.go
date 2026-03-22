@@ -26,6 +26,8 @@ type Server interface {
 	SetAppConfig(config *config.Config)
 	// RegisterRoutes 注册路由
 	RegisterRoutes()
+	// SetupStaticFiles 设置静态文件服务
+	SetupStaticFiles(relativePath, root string)
 }
 
 // Config 服务器配置

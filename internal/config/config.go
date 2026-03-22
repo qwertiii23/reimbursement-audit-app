@@ -18,6 +18,7 @@ type Config struct {
 	Postgres PostgresConfig `json:"postgres" yaml:"postgres"` // PostgreSQL配置
 	Redis    RedisConfig    `json:"redis" yaml:"redis"`       // Redis配置
 	LLM      LLMConfig      `json:"llm" yaml:"llm"`           // 大模型配置
+	RAG      RAGConfig      `json:"rag" yaml:"rag"`           // RAG配置
 	OCR      OCRConfig      `json:"ocr" yaml:"ocr"`           // OCR配置
 	Storage  StorageConfig  `json:"storage" yaml:"storage"`   // 存储配置
 	Logger   LoggerConfig   `json:"logger" yaml:"logger"`     // 日志配置
@@ -79,6 +80,26 @@ type LLMConfig struct {
 	MaxTokens   int     `json:"max_tokens" yaml:"max_tokens"`   // 最大令牌数
 	Temperature float64 `json:"temperature" yaml:"temperature"` // 温度参数
 	Timeout     int     `json:"timeout" yaml:"timeout"`         // 超时时间(秒)
+	// Embedding配置
+	EmbeddingProvider string `json:"embedding_provider" yaml:"embedding_provider"` // 向量提供商(zhipu)
+	EmbeddingModel    string `json:"embedding_model" yaml:"embedding_model"`       // 向量模型名称
+	EmbeddingAPIKey   string `json:"embedding_api_key" yaml:"embedding_api_key"`   // 向量API密钥
+	EmbeddingBaseURL  string `json:"embedding_api_base" yaml:"embedding_api_base"` // 向量API基础URL
+}
+
+// RAGConfig RAG配置
+type RAGConfig struct {
+	Enabled            bool    `json:"enabled" yaml:"enabled"`                         // 是否启用RAG
+	Model              string  `json:"model" yaml:"model"`                             // 对话模型
+	APIKey             string  `json:"api_key" yaml:"api_key"`                         // API密钥
+	APIBase            string  `json:"api_base" yaml:"api_base"`                       // API基础URL
+	MaxTokens          int     `json:"max_tokens" yaml:"max_tokens"`                   // 最大令牌数
+	Temperature        float64 `json:"temperature" yaml:"temperature"`                 // 温度参数
+	EmbeddingProvider  string  `json:"embedding_provider" yaml:"embedding_provider"`   // 向量提供商(zhipu)
+	EmbeddingModel     string  `json:"embedding_model" yaml:"embedding_model"`         // 向量模型名称
+	EmbeddingAPIKey    string  `json:"embedding_api_key" yaml:"embedding_api_key"`     // 向量API密钥
+	EmbeddingAPIBase   string  `json:"embedding_api_base" yaml:"embedding_api_base"`   // 向量API基础URL
+	EmbeddingDimension int     `json:"embedding_dimension" yaml:"embedding_dimension"` // 向量维度
 }
 
 // OCRConfig OCR配置

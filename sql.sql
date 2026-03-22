@@ -14,7 +14,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- ----------------------------
 -- 1. 城市级别配置表（city_levels）
--- 作用：存储城市与级别映射关系，为规则引擎提供“城市级别”判定依据
+-- 作用：存储城市与级别映射关系，为规则引擎提供"城市级别"判定依据
 -- ----------------------------
 DROP TABLE IF EXISTS `city_levels`;
 CREATE TABLE `city_levels` (
@@ -31,7 +31,7 @@ CREATE TABLE `city_levels` (
 
 -- ----------------------------
 -- 2. 报销单主表（reimbursements）
--- 作用：核心主表，存储报销单核心信息，作为所有关联数据的“主索引”
+-- 作用：核心主表，存储报销单核心信息，作为所有关联数据的"主索引"
 -- ----------------------------
 DROP TABLE IF EXISTS `reimbursements`;
 CREATE TABLE `reimbursements` (
@@ -52,12 +52,12 @@ CREATE TABLE `reimbursements` (
   KEY `idx_user_id` (`user_id`) COMMENT '按报销人ID查询索引，优化个人报销单查询',
   KEY `idx_status` (`status`) COMMENT '按状态查询索引，优化待审核/已审核单据筛选',
   KEY `idx_upload_time` (`upload_time`) COMMENT '按上传时间查询索引，优化时间范围查询',
-  KEY `idx_user_status` (`user_id`, `status`) COMMENT '用户+状态联合索引，优化“查询某用户待审核单据”场景'
+  KEY `idx_user_status` (`user_id`, `status`) COMMENT '用户+状态联合索引，优化"查询某用户待审核单据"场景'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报销单主表（核心业务主表）';
 
 -- ----------------------------
 -- 3. 发票表（invoices）
--- 作用：存储单张发票明细，与报销单为“一对多”关联（1张报销单可关联多张发票）
+-- 作用：存储单张发票明细，与报销单为"一对多"关联（1张报销单可关联多张发票）
 -- ----------------------------
 DROP TABLE IF EXISTS `invoices`;
 CREATE TABLE `invoices` (
@@ -85,34 +85,9 @@ CREATE TABLE `invoices` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='发票表（报销单关联表）';
 
 -- ----------------------------
--- 4. 刚性规则表（audit_rules）
--- 作用：存储规则引擎（Grule）的刚性校验规则，支持动态加载与执行
--- ----------------------------
-DROP TABLE IF EXISTS `audit_rules`;
-CREATE TABLE `audit_rules` (
-  `id` VARCHAR(36) NOT NULL COMMENT '规则唯一ID（UUID格式）',
-  `rule_code` VARCHAR(32) NOT NULL COMMENT '规则编码（如：RULE_ACCOMMODATION_AMOUNT，全局唯一）',
-  `rule_name` VARCHAR(128) NOT NULL COMMENT '规则名称（如：一线城市住宿费上限800元）',
-  `rule_content` TEXT NOT NULL COMMENT '规则内容（Grule DSL语法，规则引擎执行的核心逻辑）',
-  `priority` INT NOT NULL DEFAULT 5 COMMENT '规则优先级（1-10，1最高，决定规则执行顺序）',
-  `category` VARCHAR(32) NOT NULL COMMENT '规则适用类目（枚举值：差旅费/办公费/所有类目/其他）',
-  `status` VARCHAR(16) NOT NULL DEFAULT 'enabled' COMMENT '规则状态（枚举值：enabled-启用/disabled-禁用）',
-  `description` TEXT DEFAULT '' COMMENT '规则描述（详细说明规则适用场景、校验逻辑）',
-  `created_by` VARCHAR(64) NOT NULL COMMENT '规则创建人（财务管理员ID）',
-  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_rule_code` (`rule_code`) COMMENT '规则编码唯一约束，避免规则冲突',
-  KEY `idx_status` (`status`) COMMENT '按规则状态查询索引，优化启用规则筛选',
-  KEY `idx_category` (`category`) COMMENT '按适用类目查询索引，优化规则匹配效率',
-  KEY `idx_priority` (`priority`) COMMENT '按优先级查询索引，优化规则执行顺序排序',
-  KEY `idx_category_status` (`category`, `status`) COMMENT '类目+状态联合索引，优化“按类目查询启用规则”场景'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='刚性规则表（Grule规则引擎核心表）';
-
--- ----------------------------
--- 5. 报销制度文档表（reimbursement_documents）
+-- 4. 报销制度文档表（reimbursement_documents）
 -- 作用：存储报销制度文档（原文+向量嵌入），支撑大模型RAG检索
--- 说明：MySQL 5.6无原生向量类型，向量嵌入转换为“JSON数组→BASE64字符串”存储
+-- 说明：MySQL 5.6无原生向量类型，向量嵌入转换为"JSON数组→BASE64字符串"存储
 -- ----------------------------
 DROP TABLE IF EXISTS `reimbursement_documents`;
 CREATE TABLE `reimbursement_documents` (
@@ -131,11 +106,11 @@ CREATE TABLE `reimbursement_documents` (
   UNIQUE KEY `uk_doc_version_chunk` (`doc_version`, `chunk_id`) COMMENT '版本+分片ID唯一约束，避免重复分片',
   KEY `idx_doc_version` (`doc_version`) COMMENT '按文档版本查询索引，优化最新版本制度检索',
   KEY `idx_status` (`status`) COMMENT '按分片状态查询索引，优化有效分片筛选',
-  KEY `idx_doc_version_status` (`doc_version`, `status`) COMMENT '版本+状态联合索引，优化“查询最新版本有效分片”场景'
+  KEY `idx_doc_version_status` (`doc_version`, `status`) COMMENT '版本+状态联合索引，优化"查询最新版本有效分片"场景'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报销制度文档表（RAG检索核心表）';
 
 -- ----------------------------
--- 6. 审核任务表（audit_tasks）
+-- 5. 审核任务表（audit_tasks）
 -- 作用：跟踪异步审核流程状态（大模型调用耗时较长时必备），避免重复触发审核
 -- ----------------------------
 DROP TABLE IF EXISTS `audit_tasks`;
@@ -152,13 +127,13 @@ CREATE TABLE `audit_tasks` (
   UNIQUE KEY `uk_reimbursement_id` (`reimbursement_id`) COMMENT '报销单ID唯一约束，1张报销单对应1个审核任务',
   KEY `idx_task_status` (`task_status`) COMMENT '按任务状态查询索引，优化待执行/失败任务筛选',
   KEY `idx_retry_count` (`retry_count`) COMMENT '按重试次数查询索引，优化失败任务重试逻辑',
-  KEY `idx_status_retry` (`task_status`, `retry_count`) COMMENT '状态+重试次数联合索引，优化“重试失败任务”场景',
+  KEY `idx_status_retry` (`task_status`, `retry_count`) COMMENT '状态+重试次数联合索引，优化"重试失败任务"场景',
   -- 外键约束：删除报销单时同步删除关联审核任务
   CONSTRAINT `fk_task_reimbursement` FOREIGN KEY (`reimbursement_id`) REFERENCES `reimbursements` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='审核任务表（异步审核跟踪）';
 
 -- ----------------------------
--- 7. 审核报告主表（audit_reports）
+-- 6. 审核报告主表（audit_reports）
 -- 作用：存储报销单最终审核结果（规则引擎+大模型RAG合并结果）
 -- ----------------------------
 DROP TABLE IF EXISTS `audit_reports`;
@@ -182,7 +157,7 @@ CREATE TABLE `audit_reports` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='审核报告主表（最终审核结果存储）';
 
 -- ----------------------------
--- 8. OCR结果缓存表（ocr_caches）- 可选表
+-- 7. OCR结果缓存表（ocr_caches）- 可选表
 -- 作用：缓存发票OCR解析结果，提升重复上传发票的解析效率（简化版可省略）
 -- ----------------------------
 DROP TABLE IF EXISTS `ocr_caches`;
@@ -220,19 +195,6 @@ INSERT INTO `city_levels` (`city_name`, `city_level`, `remark`) VALUES
 ('郑州', '二线城市', '2024年第一财经榜单认定'),
 ('长沙', '二线城市', '2024年第一财经榜单认定'),
 ('青岛', '二线城市', '2024年第一财经榜单认定');
-
--- ----------------------------
--- 初始化基础数据 - 刚性规则示例（可根据实际业务调整）
--- 说明：MySQL 5.6 无原生 UUID()，手动生成示例 UUID（实际开发需通过业务层生成唯一UUID）
--- ----------------------------
-INSERT INTO `audit_rules` (`id`, `rule_code`, `rule_name`, `rule_content`, `priority`, `category`, `status`, `description`, `created_by`) VALUES
-('550e8400-e29b-41d4-a716-446655440001', 'RULE_ACCOMMODATION_FIRST_TIER', '一线城市住宿费上限', 'Reimbursement.Category == "差旅费" && Reimbursement.CityLevel == "一线城市" && Reimbursement.TotalAmount > 800', 3, '差旅费', 'enabled', '一线城市出差住宿费单日上限800元，超出自动触发违规提示', 'admin'),
-('550e8400-e29b-41d4-a716-446655440002', 'RULE_ACCOMMODATION_NEW_FIRST_TIER', '新一线城市住宿费上限', 'Reimbursement.Category == "差旅费" && Reimbursement.CityLevel == "新一线城市" && Reimbursement.TotalAmount > 600', 3, '差旅费', 'enabled', '新一线城市出差住宿费单日上限600元，超出自动触发违规提示', 'admin'),
-('550e8400-e29b-41d4-a716-446655440003', 'RULE_ACCOMMODATION_SECOND_TIER', '二线城市住宿费上限', 'Reimbursement.Category == "差旅费" && Reimbursement.CityLevel == "二线城市" && Reimbursement.TotalAmount > 400', 3, '差旅费', 'enabled', '二线城市出差住宿费单日上限400元，超出自动触发违规提示', 'admin'),
-('550e8400-e29b-41d4-a716-446655440004', 'RULE_MEAL_ALLOWANCE_DAILY', '单日餐饮补贴上限', 'Reimbursement.Category == "差旅费" && Reimbursement.TotalAmount > 150', 4, '差旅费', 'enabled', '出差期间单日餐饮补贴上限150元，超出自动触发违规提示', 'admin'),
-('550e8400-e29b-41d4-a716-446655440005', 'RULE_RECEIPT_DUPLICATE', '发票重复报销校验', 'EXISTS(SELECT 1 FROM invoices WHERE invoice_no = CURRENT_INVOICE_NO AND reimbursement_id != CURRENT_REIMBURSEMENT_ID)', 2, '所有类目', 'enabled', '校验发票号码是否已在其他报销单中使用，防止重复报销', 'admin'),
-('550e8400-e29b-41d4-a716-446655440006', 'RULE_BUSINESS_ENTERTAINMENT_LIMIT', '业务招待费上限', 'Reimbursement.Category == "业务招待费" && Reimbursement.TotalAmount > 2000', 2, '业务招待费', 'enabled', '单次业务招待费上限2000元，超需人工复核', 'admin'),
-('550e8400-e29b-41d4-a716-446655440007', 'RULE_OFFICE_SUPPLIES_FREQUENCY', '办公费月报销频次', 'Reimbursement.Category == "办公费" && (SELECT COUNT(1) FROM reimbursements WHERE user_id = CURRENT_USER_ID AND category = "办公费" AND DATE_FORMAT(upload_time, "%Y-%m") = DATE_FORMAT(NOW(), "%Y-%m")) > 5', 4, '办公费', 'enabled', '同一用户每月办公费报销次数不超过5次，超次自动触发违规', 'admin');
 
 -- ------------------------------------------------------
 -- 执行说明（MySQL 5.6 专属）

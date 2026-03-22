@@ -14,7 +14,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/goccy/go-yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // Loader 配置加载器结构体

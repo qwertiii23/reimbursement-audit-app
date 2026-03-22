@@ -72,25 +72,31 @@ func (s *Service) GenerateFilePath(fileID, filename string) string {
 
 // UploadInvoice 上传发票文件
 func (s *Service) UploadInvoice(ctx context.Context, file *multipart.FileHeader) (*FileInfo, error) {
-	// 获取traceId用于日志追踪
 	traceId := middleware.GetTraceIdFromContext(ctx)
 
-	// 校验文件
 	if err := s.ValidateFile(file); err != nil {
 		return nil, fmt.Errorf("%w, traceId: %s", err, traceId)
 	}
 
-	// 生成文件UUID
 	fileID := s.GenerateFileUUID()
 
-	// 生成文件存储路径
 	filePath := s.GenerateFilePath(fileID, file.Filename)
 
-	// 上传文件
 	fileInfo, err := s.storage.UploadFile(ctx, file, filePath)
 	if err != nil {
 		return nil, fmt.Errorf("上传文件失败: %w, traceId: %s", err, traceId)
 	}
 
 	return fileInfo, nil
+}
+
+// DeleteFile 删除文件
+func (s *Service) DeleteFile(ctx context.Context, path string) error {
+	traceId := middleware.GetTraceIdFromContext(ctx)
+
+	if err := s.storage.DeleteFile(ctx, path); err != nil {
+		return fmt.Errorf("删除文件失败: %w, traceId: %s", err, traceId)
+	}
+
+	return nil
 }

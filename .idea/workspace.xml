@@ -5,29 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c99502e4-42b0-41ee-8127-da27adbb99a3" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/sql/create_rules_table.sql" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/migrate/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/migrate/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/server/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/server/main.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/configs/config.dev.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/configs/config.dev.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/configs/config.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/configs/config.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/handler/audit_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/audit_handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/handler/query_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/query_handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/handler/rule_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/rule_handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/handler/upload_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/upload_handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/api/response/code.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/response/code.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/config/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/config/config.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/config/loader.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/config/loader.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/domain/ocr/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/ocr/model.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/domain/reimbursement/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/reimbursement/model.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/domain/rule/model.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/model.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/domain/rule/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/rule/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/infra/storage/mysql/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/infra/storage/mysql/config.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/infra/storage/mysql/migration/migration.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/infra/storage/mysql/migration/migration.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/server/impl.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/server/impl.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server" beforeDir="false" afterPath="$PROJECT_DIR$/server" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,6 +35,7 @@
     &quot;Go Build.go build reimbursement-audit/cmd/api.executor&quot;: &quot;Debug&quot;,
     &quot;Go Build.go build reimbursement-audit/cmd/migrate.executor&quot;: &quot;Debug&quot;,
     &quot;Go Build.go build reimbursement-audit/cmd/server.executor&quot;: &quot;Debug&quot;,
+    &quot;Go Test.reimbursement_workflow_test.go.executor&quot;: &quot;Debug&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
@@ -83,7 +64,7 @@
       </set>
     </option>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Go Build.go build reimbursement-audit/cmd/server">
     <configuration name="go build reimbursement-audit/cmd/server" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
       <module name="reimbursement-audit" />
       <working_directory value="$PROJECT_DIR$" />
@@ -93,9 +74,20 @@
       <filePath value="$PROJECT_DIR$/cmd/server/main.go" />
       <method v="2" />
     </configuration>
+    <configuration name="reimbursement_workflow_test.go" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="reimbursement-audit" />
+      <working_directory value="$PROJECT_DIR$/test/integration" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="FILE" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$/test/integration/reimbursement_workflow_test.go" />
+      <framework value="gotest" />
+      <method v="2" />
+    </configuration>
     <recent_temporary>
       <list>
         <item itemvalue="Go Build.go build reimbursement-audit/cmd/server" />
+        <item itemvalue="Go Test.reimbursement_workflow_test.go" />
       </list>
     </recent_temporary>
   </component>
@@ -132,6 +124,26 @@
           <url>file://$PROJECT_DIR$/main.go</url>
           <line>20</line>
           <option name="timeStamp" value="1" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/internal/domain/rag/llm_client.go</url>
+          <line>16</line>
+          <option name="timeStamp" value="9" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/internal/domain/rule/grule_engine.go</url>
+          <line>449</line>
+          <option name="timeStamp" value="10" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/internal/domain/audit/service.go</url>
+          <line>149</line>
+          <option name="timeStamp" value="15" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/internal/domain/audit/service.go</url>
+          <line>166</line>
+          <option name="timeStamp" value="19" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

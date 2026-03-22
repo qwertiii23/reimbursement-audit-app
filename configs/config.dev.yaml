@@ -22,7 +22,7 @@ database:
   host: "localhost"
   port: 3306
   username: "root"
-  password: "password"
+  password: "Ljq20040811."
   dbname: "reimbursement_audit"
   charset: "utf8mb4"
   collation: "utf8mb4_unicode_ci"
@@ -64,32 +64,44 @@ storage:
 
 # OCR配置
 ocr:
-  provider: "tencent"  # tencent
-  secret_id: ""        # 腾讯云SecretId
-  secret_key: ""       # 腾讯云SecretKey
-  region: "ap-beijing" # 腾讯云地域
-  timeout: 30          # 超时时间(秒)
-  max_retries: 3       # 最大重试次数
+  provider: "tencent"
+  secret_id: "AKID6FPOExZ3NB2471tZ5bxAC4kFZgcNyNab"
+  secret_key: "98xc7TedT9dv0tc9T2QcvAJNM995qRq"
+  region: "ap-beijing"
+  timeout: 30
+  max_retries: 3
+
+# LLM配置
+llm:
+  provider: "deepseek"
+  api_key: "sk-61bb8de8c1234a368c3cb5e3609b2d20"
+  base_url: "https://api.deepseek.com/v1"
+  model: "deepseek-chat"
+  max_tokens: 2000
+  temperature: 0.7
+  timeout: 60
 
 # RAG配置
+# RAG 配置（DeepSeek 版）
 rag:
   enabled: true
-  model: "gpt-3.5-turbo"
-  api_key: ""
-  api_base: ""
+  # 对话模型
+  model: "deepseek-chat"
+  api_key: "${DEEPSEEK_API_KEY}"  # 从环境变量获取
+  api_base: "https://api.deepseek.com/v1"
   max_tokens: 1000
   temperature: 0.7
-  embedding_model: "text-embedding-ada-002"
-  vector_db:
-    type: "chroma"  # chroma, pinecone, weaviate
-    host: "localhost"
-    port: 8000
-    collection_name: "reimbursement_docs"
+  # 向量化模型配置（使用智谱AI）
+  embedding_provider: "zhipu"
+  embedding_model: "embedding-3"
+  embedding_api_key: "d1f2189e1e6c45fbb522481a0f32437c.tvBH9rduuRgWgxEu"
+  embedding_api_base: "https://open.bigmodel.cn/api/paas/v4"
+  embedding_dimension: 768
 
 # 认证配置
 auth:
   enabled: true
-  secret_key: "your-secret-key"
+  secret_key: "${JWT_SECRET_KEY}"  # 从环境变量获取
   expire_hours: 24
   issuer: "reimbursement-audit"
 
@@ -137,3 +149,11 @@ monitoring:
   ready_check:
     enabled: true
     path: "/ready"
+
+postgres:
+  host: "localhost"
+  port: 5432
+  username: "postgres"
+  password: "${POSTGRES_PASSWORD}"  # 从环境变量获取
+  dbname: "reimbursement_audit"
+  sslmode: "disable"

@@ -91,7 +91,7 @@ func (s *DomainService) CreateReimbursement(ctx context.Context, req *CreateReim
 		Currency:    "CNY", // 默认使用人民币
 		ApplyDate:   applyDate,
 		ExpenseDate: expenseDate,
-		Status:      "待提交", // 初始状态为"待提交"
+		Status:      "pending_submission", // 初始状态为"待提交"
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"reimbursement-audit/internal/api/request"
 	"reimbursement-audit/internal/api/response"
 	"reimbursement-audit/internal/application/service"
 	"reimbursement-audit/internal/domain/audit"
@@ -80,16 +81,66 @@ func (h *QueryHandler) GetReimbursementsByUserID(c *gin.Context) {
 		size = 10
 	}
 
+	title := c.Query("title")
+	status := c.Query("status")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
 	h.logger.WithContext(c.Request.Context()).Info("根据用户ID查询报销单列表",
 		logger.NewField("user_id", userID),
 		logger.NewField("page", page),
-		logger.NewField("size", size))
+		logger.NewField("size", size),
+		logger.NewField("title", title),
+		logger.NewField("status", status),
+		logger.NewField("start_date", startDate),
+		logger.NewField("end_date", endDate))
 
-	reimbursements, total, err := h.reimbursementRepo.ListReimbursementsByUserID(c.Request.Context(), userID, page, size)
+	reimbursements, total, err := h.reimbursementRepo.ListReimbursementsByUserIDWithFilters(c.Request.Context(), userID, page, size, title, status, startDate, endDate)
 	if err != nil {
 		h.logger.WithContext(c.Request.Context()).Error("查询报销单列表失败",
 			logger.NewField("error", err.Error()),
 			logger.NewField("user_id", userID))
+		response.ErrorResponse(c, http.StatusInternalServerError, "查询报销单列表失败: "+err.Error())
+		return
+	}
+
+	response.JSONResponse(c, 200, "success", gin.H{
+		"list":  reimbursements,
+		"total": total,
+		"page":  page,
+		"size":  size,
+	})
+}
+
+// GetAllReimbursements 获取所有报销单（管理员使用）
+func (h *QueryHandler) GetAllReimbursements(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 || size > 100 {
+		size = 10
+	}
+
+	title := c.Query("title")
+	status := c.Query("status")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
+	h.logger.WithContext(c.Request.Context()).Info("获取所有报销单列表",
+		logger.NewField("page", page),
+		logger.NewField("size", size),
+		logger.NewField("title", title),
+		logger.NewField("status", status),
+		logger.NewField("start_date", startDate),
+		logger.NewField("end_date", endDate))
+
+	reimbursements, total, err := h.reimbursementRepo.ListAllReimbursementsWithFilters(c.Request.Context(), page, size, title, status, startDate, endDate)
+	if err != nil {
+		h.logger.WithContext(c.Request.Context()).Error("查询报销单列表失败",
+			logger.NewField("error", err.Error()))
 		response.ErrorResponse(c, http.StatusInternalServerError, "查询报销单列表失败: "+err.Error())
 		return
 	}
@@ -172,4 +223,32 @@ func (h *QueryHandler) GetAuditReport(c *gin.Context) {
 	}
 
 	response.SuccessResponse(c, auditResult)
+}
+
+// UpdateReimbursement 更新报销单
+func (h *QueryHandler) UpdateReimbursement(c *gin.Context) {
+	var req request.UpdateReimbursementRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ErrorResponse(c, http.StatusBadRequest, "请求参数格式错误: "+err.Error())
+		return
+	}
+
+	if err := req.Validate(); err != nil {
+		response.ErrorResponse(c, http.StatusBadRequest, "参数校验失败: "+err.Error())
+		return
+	}
+
+	h.logger.WithContext(c.Request.Context()).Info("更新报销单",
+		logger.NewField("reimbursement_id", req.ID))
+
+	result, err := h.reimbursementService.UpdateReimbursement(c.Request.Context(), &req)
+	if err != nil {
+		h.logger.WithContext(c.Request.Context()).Error("更新报销单失败",
+			logger.NewField("error", err.Error()),
+			logger.NewField("reimbursement_id", req.ID))
+		response.ErrorResponse(c, http.StatusInternalServerError, "更新报销单失败: "+err.Error())
+		return
+	}
+
+	response.SuccessResponse(c, result)
 }
