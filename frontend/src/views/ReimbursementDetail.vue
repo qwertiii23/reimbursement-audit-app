@@ -76,9 +76,9 @@
                       type="primary"
                       link
                       size="small"
-                      @click="toggleInvoiceDetail(invoice.id)"
+                      @click="showInvoiceDetailDialog(invoice)"
                     >
-                      {{ expandedInvoices[invoice.id] ? '收起' : '详情' }}
+                      详情
                     </el-button>
                     <el-button
                       type="warning"
@@ -90,26 +90,6 @@
                       更换图片
                     </el-button>
                   </div>
-                </div>
-                <div class="invoice-ocr-detail" v-if="expandedInvoices[invoice.id]">
-                  <el-descriptions :column="2" border size="small">
-                    <el-descriptions-item label="发票类型">{{ invoice.type || '未识别' }}</el-descriptions-item>
-                    <el-descriptions-item label="发票号码">{{ invoice.number || '未识别' }}</el-descriptions-item>
-                    <el-descriptions-item label="发票日期">{{ invoice.date || '未识别' }}</el-descriptions-item>
-                    <el-descriptions-item label="发票金额">¥{{ invoice.amount?.toFixed(2) || '0.00' }}</el-descriptions-item>
-                    <el-descriptions-item label="税额">¥{{ invoice.tax_amount?.toFixed(2) || '0.00' }}</el-descriptions-item>
-                    <el-descriptions-item label="购买方">{{ invoice.buyer_name || '未识别' }}</el-descriptions-item>
-                    <el-descriptions-item label="销售方">{{ invoice.seller_name || '未识别' }}</el-descriptions-item>
-                    <el-descriptions-item label="商品名称">{{ invoice.commodity_name || '未识别' }}</el-descriptions-item>
-                    <el-descriptions-item label="数量">{{ invoice.quantity || '未识别' }}</el-descriptions-item>
-                    <el-descriptions-item label="单价">¥{{ invoice.price?.toFixed(2) || '0.00' }}</el-descriptions-item>
-                    <el-descriptions-item label="类别" :span="2">{{ invoice.category || '未识别' }} / {{ invoice.sub_category || '未识别' }}</el-descriptions-item>
-                    <el-descriptions-item label="OCR状态" :span="2">
-                      <el-tag :type="invoice.ocr_result ? 'success' : 'info'" size="small">
-                        {{ invoice.ocr_result ? '已识别' : '待识别' }}
-                      </el-tag>
-                    </el-descriptions-item>
-                  </el-descriptions>
                 </div>
               </div>
             </el-col>
@@ -305,6 +285,80 @@
       <el-image :src="previewImageUrl" fit="contain" style="width: 100%" />
     </el-dialog>
 
+    <el-dialog v-model="showInvoiceDetailDialog" title="发票详情" width="700px">
+      <div v-if="currentInvoice" class="invoice-detail-content">
+        <div class="invoice-image-preview">
+          <el-image 
+            :src="getImageUrl(currentInvoice.image_path)" 
+            fit="contain"
+            style="width: 100%; max-height: 400px;"
+          >
+            <template #error>
+              <div class="image-error">
+                <el-icon><Picture /></el-icon>
+                <span>图片加载失败</span>
+              </div>
+            </template>
+          </el-image>
+        </div>
+        
+        <el-divider />
+        
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="发票类型">
+            {{ currentInvoice.type || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="发票号码">
+            {{ currentInvoice.number || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="发票日期">
+            {{ currentInvoice.date || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="发票金额">
+            <span class="amount-text">¥{{ currentInvoice.amount?.toFixed(2) || '0.00' }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="税额">
+            ¥{{ currentInvoice.tax_amount?.toFixed(2) || '0.00' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="价税合计">
+            <span class="amount-text">¥{{ currentInvoice.total_amount?.toFixed(2) || '0.00' }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="购买方" :span="2">
+            {{ currentInvoice.buyer_name || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="销售方" :span="2">
+            {{ currentInvoice.seller_name || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="商品名称" :span="2">
+            {{ currentInvoice.commodity_name || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="规格型号">
+            {{ currentInvoice.specification || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="单位">
+            {{ currentInvoice.unit || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="数量">
+            {{ currentInvoice.quantity || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="单价">
+            ¥{{ currentInvoice.price?.toFixed(2) || '0.00' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="报销类别" :span="2">
+            {{ currentInvoice.category || '未识别' }} / {{ currentInvoice.sub_category || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="OCR状态" :span="2">
+            <el-tag :type="currentInvoice.ocr_result ? 'success' : 'info'" size="default">
+              {{ currentInvoice.ocr_result ? '已识别' : '待识别' }}
+            </el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+      <template #footer>
+        <el-button @click="showInvoiceDetailDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="showUpdateImageDialog" title="更换图片" width="500px">
       <el-upload
         ref="updateImageRef"
@@ -346,14 +400,15 @@ const invoices = ref([])
 const auditResult = ref(null)
 const auditStatus = ref(null)
 const flowLogs = ref([])
-const expandedInvoices = ref({})
 const refreshing = ref(false)
 const loadingFlowLogs = ref(false)
 
 const showUploadDialog = ref(false)
 const showImageDialog = ref(false)
 const showUpdateImageDialog = ref(false)
+const showInvoiceDetailDialog = ref(false)
 const previewImageUrl = ref('')
+const currentInvoice = ref(null)
 
 const uploading = ref(false)
 const updating = ref(false)
@@ -624,8 +679,9 @@ const getImageUrl = (imagePath) => {
   return `http://127.0.0.1:8080/api/v1/files/${imagePath}`
 }
 
-const toggleInvoiceDetail = (invoiceId) => {
-  expandedInvoices.value[invoiceId] = !expandedInvoices.value[invoiceId]
+const showInvoiceDetailDialog = (invoice) => {
+  currentInvoice.value = invoice
+  showInvoiceDetailDialog.value = true
 }
 
 const handleUpdateInvoiceImage = async (invoiceId) => {
@@ -967,5 +1023,41 @@ onMounted(() => {
 .actions {
   display: flex;
   flex-direction: column;
+}
+
+.invoice-detail-content {
+  padding: 10px 0;
+}
+
+.invoice-image-preview {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.invoice-image-preview :deep(.el-image) {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.image-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 300px;
+  background: #f5f7fa;
+  color: #909399;
+  border-radius: 8px;
+}
+
+.image-error .el-icon {
+  font-size: 48px;
+}
+
+.amount-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e74c3c;
 }
 </style>
