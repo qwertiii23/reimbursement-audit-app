@@ -1,0 +1,15 @@
+{
+  "reimbursement_id": "test-invoice-date-future-001",
+  "user_id": "test-user-001",
+  "amount": 1000.00,
+  "description": "测试开票日期有效性校验 - 未来日期",
+  "invoice_date": "2026-12-01",
+  "invoice_number": "12345678",
+  "invoice_code": "123456789012",
+  "invoice_type": "增值税专用发票",
+  "seller_name": "测试公司A",
+  "buyer_name": "测试公司B",
+  "total_amount": 1000.00,
+  "tax_amount": 130.00,
+  "image_url": "http://example.com/invoice1.jpg"
+}

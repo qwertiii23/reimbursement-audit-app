@@ -329,7 +329,7 @@ func (s *serverImpl) RegisterRoutes() {
 
 	// 创建审核仓储和审核服务
 	auditRepo := mysqlRepo.NewAuditRepository(mysqlClient, loggerInstance)
-	auditDomainService := audit.NewService(auditRepo, reimbursementRepo, ruleEngineService, ragService, loggerInstance)
+	auditDomainService := audit.NewService(auditRepo, reimbursementRepo, ruleEngineService, ragService, ocrDomainService, loggerInstance)
 	auditAppService := service.NewAuditApplicationService(auditDomainService, loggerInstance)
 
 	// 创建上传处理器

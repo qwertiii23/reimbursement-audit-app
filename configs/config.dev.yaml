@@ -93,10 +93,10 @@ rag:
   temperature: 0.7
   # 向量化模型配置（使用智谱AI）
   embedding_provider: "zhipu"
-  embedding_model: "embedding-3"
+  embedding_model: "embedding-2"
   embedding_api_key: "d1f2189e1e6c45fbb522481a0f32437c.tvBH9rduuRgWgxEu"
   embedding_api_base: "https://open.bigmodel.cn/api/paas/v4"
-  embedding_dimension: 768
+  embedding_dimension: 1024
 
 # 认证配置
 auth:

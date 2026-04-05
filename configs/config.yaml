@@ -83,12 +83,14 @@ ocr:
 # RAG配置
 rag:
   enabled: true
-  model: "gpt-3.5-turbo"
-  api_key: ""
-  api_base: ""
+  model: "glm-4-flash"
+  api_key: "d1f2189e1e6c45fbb522481a0f32437c.tvBH9rduuRgWgxEu"
+  api_base: "https://open.bigmodel.cn/api/paas/v4"
   max_tokens: 1000
   temperature: 0.7
-  embedding_model: "text-embedding-ada-002"
+  embedding_model: "embedding-2"
+  embedding_provider: "zhipu"
+  embedding_dimension: 1024
   vector_db:
     type: "chroma"  # chroma, pinecone, weaviate
     host: "localhost"

@@ -21,7 +21,13 @@ type Service struct {
 	reimbursementRepo reimbursement.Repository
 	ruleEngineService *ruleenginedomain.RuleEngineService
 	ragService        *rag.RAGService
+	ocrService        OCRService
 	logger            logger.Logger
+}
+
+// OCRService OCR服务接口
+type OCRService interface {
+	ParseInvoiceImage(ctx context.Context, invoiceID string) error
 }
 
 // NewService 创建审核服务
@@ -30,6 +36,7 @@ func NewService(
 	reimbursementRepo reimbursement.Repository,
 	ruleEngineService *ruleenginedomain.RuleEngineService,
 	ragService *rag.RAGService,
+	ocrService OCRService,
 	logger logger.Logger,
 ) *Service {
 	return &Service{
@@ -37,6 +44,7 @@ func NewService(
 		reimbursementRepo: reimbursementRepo,
 		ruleEngineService: ruleEngineService,
 		ragService:        ragService,
+		ocrService:        ocrService,
 		logger:            logger,
 	}
 }
@@ -93,6 +101,29 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 	audit.WorkflowStatus = WorkflowStatusRuleAudit
 	audit.UpdatedAt = startTime
 	s.repo.UpdateAudit(ctx, audit)
+
+	if s.ocrService != nil && len(reimbursement.Invoices) > 0 {
+		s.logger.WithContext(ctx).Info("检查发票OCR状态", logger.NewField("invoice_count", len(reimbursement.Invoices)))
+
+		for _, invoice := range reimbursement.Invoices {
+			if invoice.Status == "待识别" || invoice.CommodityName == "" {
+				s.logger.WithContext(ctx).Info("发票未完成OCR识别，开始执行OCR",
+					logger.NewField("invoice_id", invoice.ID),
+					logger.NewField("current_status", invoice.Status))
+
+				if err := s.ocrService.ParseInvoiceImage(ctx, invoice.ID); err != nil {
+					s.logger.WithContext(ctx).Error("OCR识别失败",
+						logger.NewField("invoice_id", invoice.ID),
+						logger.NewField("error", err))
+				}
+			}
+		}
+
+		reimbursement.Invoices, err = s.reimbursementRepo.GetInvoicesByReimbursementID(ctx, reimbursementID)
+		if err != nil {
+			s.logger.WithContext(ctx).Error("重新获取发票信息失败", logger.NewField("error", err))
+		}
+	}
 
 	ruleResults, err := s.executeRuleValidation(ctx, reimbursement)
 	if err != nil {
