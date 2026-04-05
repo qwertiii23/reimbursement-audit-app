@@ -76,7 +76,7 @@
                       type="primary"
                       link
                       size="small"
-                      @click="showInvoiceDetailDialog(invoice)"
+                      @click="openInvoiceDetailDialog(invoice)"
                     >
                       详情
                     </el-button>
@@ -285,7 +285,7 @@
       <el-image :src="previewImageUrl" fit="contain" style="width: 100%" />
     </el-dialog>
 
-    <el-dialog v-model="showInvoiceDetailDialog" title="发票详情" width="700px">
+    <el-dialog v-model="invoiceDetailDialog" title="发票详情" width="700px">
       <div v-if="currentInvoice" class="invoice-detail-content">
         <div class="invoice-image-preview">
           <el-image 
@@ -355,7 +355,7 @@
         </el-descriptions>
       </div>
       <template #footer>
-        <el-button @click="showInvoiceDetailDialog = false">关闭</el-button>
+        <el-button @click="invoiceDetailDialog = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -406,7 +406,7 @@ const loadingFlowLogs = ref(false)
 const showUploadDialog = ref(false)
 const showImageDialog = ref(false)
 const showUpdateImageDialog = ref(false)
-const showInvoiceDetailDialog = ref(false)
+const invoiceDetailDialog = ref(false)
 const previewImageUrl = ref('')
 const currentInvoice = ref(null)
 
@@ -679,9 +679,9 @@ const getImageUrl = (imagePath) => {
   return `http://127.0.0.1:8080/api/v1/files/${imagePath}`
 }
 
-const showInvoiceDetailDialog = (invoice) => {
+const openInvoiceDetailDialog = (invoice) => {
   currentInvoice.value = invoice
-  showInvoiceDetailDialog.value = true
+  invoiceDetailDialog.value = true
 }
 
 const handleUpdateInvoiceImage = async (invoiceId) => {
