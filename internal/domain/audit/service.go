@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"reimbursement-audit/internal/domain/rag"
@@ -366,7 +367,7 @@ func (s *Service) executeRuleValidation(ctx context.Context, reimbursement *reim
 		}
 
 		for _, result := range results {
-			if !result.Passed {
+			if !result.Passed && !strings.Contains(result.Message, "未命中") {
 				allResults = append(allResults, &RuleValidationResult{
 					RuleID:        result.RuleID,
 					RuleCode:      result.RuleID,
