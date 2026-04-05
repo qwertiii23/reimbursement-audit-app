@@ -81,38 +81,34 @@
                       {{ expandedInvoices[invoice.id] ? '收起' : '详情' }}
                     </el-button>
                     <el-button
-                      type="primary"
-                      link
-                      size="small"
-                      @click="triggerOCR(invoice.id)"
-                      v-if="!invoice.ocr_result"
-                    >
-                      OCR识别
-                    </el-button>
-                    <el-button
                       type="warning"
                       link
                       size="small"
                       @click="handleUpdateInvoiceImage(invoice.id)"
-                      v-if="reimbursement.status === 'pending'"
+                      v-if="reimbursement.status === 'pending_submission' || reimbursement.status === 'pending'"
                     >
                       更换图片
                     </el-button>
                   </div>
                 </div>
-                <div class="invoice-ocr-detail" v-if="expandedInvoices[invoice.id] && invoice.ocr_result">
+                <div class="invoice-ocr-detail" v-if="expandedInvoices[invoice.id]">
                   <el-descriptions :column="2" border size="small">
-                    <el-descriptions-item label="发票类型">{{ invoice.type }}</el-descriptions-item>
-                    <el-descriptions-item label="发票号码">{{ invoice.number }}</el-descriptions-item>
-                    <el-descriptions-item label="发票日期">{{ invoice.date }}</el-descriptions-item>
-                    <el-descriptions-item label="发票金额">¥{{ invoice.amount?.toFixed(2) }}</el-descriptions-item>
-                    <el-descriptions-item label="税额">¥{{ invoice.tax_amount?.toFixed(2) }}</el-descriptions-item>
-                    <el-descriptions-item label="购买方">{{ invoice.buyer_name }}</el-descriptions-item>
-                    <el-descriptions-item label="销售方">{{ invoice.seller_name }}</el-descriptions-item>
-                    <el-descriptions-item label="商品名称">{{ invoice.commodity_name }}</el-descriptions-item>
-                    <el-descriptions-item label="数量">{{ invoice.quantity }}</el-descriptions-item>
-                    <el-descriptions-item label="单价">¥{{ invoice.price?.toFixed(2) }}</el-descriptions-item>
-                    <el-descriptions-item label="类别" :span="2">{{ invoice.category }} / {{ invoice.sub_category }}</el-descriptions-item>
+                    <el-descriptions-item label="发票类型">{{ invoice.type || '未识别' }}</el-descriptions-item>
+                    <el-descriptions-item label="发票号码">{{ invoice.number || '未识别' }}</el-descriptions-item>
+                    <el-descriptions-item label="发票日期">{{ invoice.date || '未识别' }}</el-descriptions-item>
+                    <el-descriptions-item label="发票金额">¥{{ invoice.amount?.toFixed(2) || '0.00' }}</el-descriptions-item>
+                    <el-descriptions-item label="税额">¥{{ invoice.tax_amount?.toFixed(2) || '0.00' }}</el-descriptions-item>
+                    <el-descriptions-item label="购买方">{{ invoice.buyer_name || '未识别' }}</el-descriptions-item>
+                    <el-descriptions-item label="销售方">{{ invoice.seller_name || '未识别' }}</el-descriptions-item>
+                    <el-descriptions-item label="商品名称">{{ invoice.commodity_name || '未识别' }}</el-descriptions-item>
+                    <el-descriptions-item label="数量">{{ invoice.quantity || '未识别' }}</el-descriptions-item>
+                    <el-descriptions-item label="单价">¥{{ invoice.price?.toFixed(2) || '0.00' }}</el-descriptions-item>
+                    <el-descriptions-item label="类别" :span="2">{{ invoice.category || '未识别' }} / {{ invoice.sub_category || '未识别' }}</el-descriptions-item>
+                    <el-descriptions-item label="OCR状态" :span="2">
+                      <el-tag :type="invoice.ocr_result ? 'success' : 'info'" size="small">
+                        {{ invoice.ocr_result ? '已识别' : '待识别' }}
+                      </el-tag>
+                    </el-descriptions-item>
                   </el-descriptions>
                 </div>
               </div>
