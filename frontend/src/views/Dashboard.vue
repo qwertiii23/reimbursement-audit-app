@@ -1,127 +1,188 @@
 <template>
   <div class="dashboard">
+    <!-- 页面头部 -->
     <div class="page-header">
-      <div class="header-left">
-        <h1>仪表盘</h1>
-        <p>欢迎回来，{{ userStore.user?.username }}</p>
-      </div>
-      <div class="header-right">
-        <div class="quick-actions">
-          <el-button type="primary" size="small" @click="$router.push('/reimbursement')">
-            <el-icon><Plus /></el-icon>
-            新建报销单
-          </el-button>
-          <el-button type="success" size="small" @click="$router.push('/audit')" v-if="isAdmin">
-            <el-icon><Checked /></el-icon>
-            待审核
-          </el-button>
-          <el-button type="info" size="small" @click="$router.push('/rule-engine')" v-if="isAdmin">
-            <el-icon><Setting /></el-icon>
-            规则引擎管理
-          </el-button>
+      <div class="header-content">
+        <div class="header-left">
+          <div class="welcome-badge">
+            <el-icon><Sunny /></el-icon>
+            <span>工作台</span>
+          </div>
+          <h1 class="greeting">欢迎回来，{{ userStore.user?.username }}</h1>
+          <p class="subtitle">这是您的报销管理概览</p>
+        </div>
+
+        <div class="header-right">
+          <div class="action-group">
+            <button class="btn-primary" @click="$router.push('/reimbursement')">
+              <el-icon><Plus /></el-icon>
+              <span>新建报销单</span>
+            </button>
+            <button
+              v-if="isAdmin"
+              class="btn-success" @click="$router.push('/audit')"
+            >
+              <el-icon><Checked /></el-icon>
+              <span>待审核</span>
+              <span class="badge">{{ stats.pending || 0 }}</span>
+            </button>
+            <button
+              v-if="isAdmin"
+              class="btn-outline" @click="$router.push('/rule-engine')"
+            >
+              <el-icon><Setting /></el-icon>
+              <span>规则引擎</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <el-row :gutter="20" class="stats-row">
-      <el-col :xs="24" :sm="12" :md="6">
-        <div class="stat-card">
-          <div class="stat-icon total">
-            <el-icon><Document /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.total }}</div>
-            <div class="stat-label">总报销单</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
-        <div class="stat-card">
-          <div class="stat-icon pending">
-            <el-icon><Clock /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.pending }}</div>
-            <div class="stat-label">待审核</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
-        <div class="stat-card">
-          <div class="stat-icon approved">
-            <el-icon><CircleCheck /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.approved }}</div>
-            <div class="stat-label">已通过</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
-        <div class="stat-card">
-          <div class="stat-icon rejected">
-            <el-icon><CircleClose /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.rejected }}</div>
-            <div class="stat-label">已驳回</div>
-          </div>
-        </div>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="20" class="content-row">
-      <el-col :xs="24" :lg="24">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span class="card-title">近期报销单</span>
-              <el-button type="primary" link @click="$router.push('/reimbursement')">
-                查看全部 <el-icon><ArrowRight /></el-icon>
-              </el-button>
+    <!-- 统计卡片区域 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div
+          v-for="(stat, index) in statCards"
+          :key="stat.key"
+          class="stat-card"
+          :class="`stat-${stat.key}`"
+          :style="{ animationDelay: `${index * 0.1}s` }"
+        >
+          <div class="card-header">
+            <div class="icon-wrapper" :class="`icon-${stat.key}`">
+              <el-icon><component :is="stat.icon" /></el-icon>
             </div>
-          </template>
-          <el-table :data="recentReimbursements" style="width: 100%" stripe>
-            <el-table-column prop="id" label="ID" width="200">
+          </div>
+
+          <div class="card-body">
+            <div class="stat-value">{{ stats[stat.key] }}</div>
+            <div class="stat-label">{{ stat.label }}</div>
+          </div>
+
+          <div class="card-footer">
+            <div class="trend-indicator" :class="stat.trend > 0 ? 'up' : 'down'">
+              <el-icon v-if="stat.trend > 0"><Top /></el-icon>
+              <el-icon v-else><Bottom /></el-icon>
+              <span>{{ Math.abs(stat.trend) }}%</span>
+            </div>
+            <span class="trend-text">较上月</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 内容区域 -->
+    <div class="content-grid">
+      <!-- 近期报销单表格 -->
+      <div class="table-card">
+        <div class="table-header">
+          <div class="header-left-section">
+            <h3 class="section-title">
+              <el-icon><Document /></el-icon>
+              <span>近期报销单</span>
+            </h3>
+            <p class="section-subtitle">最近提交的报销记录</p>
+          </div>
+          <button class="view-all-btn" @click="$router.push('/reimbursement')">
+            <span>查看全部</span>
+            <el-icon><ArrowRight /></el-icon>
+          </button>
+        </div>
+
+        <div class="table-container">
+          <el-table
+            :data="recentReimbursements"
+            style="width: 100%"
+            class="custom-table"
+            row-class-name="table-row"
+          >
+            <el-table-column prop="id" label="单号" width="200">
               <template #default="{ row }">
-                <el-tooltip :content="row.id" placement="top">
-                  <span class="id-text">{{ row.id.substring(0, 12) }}...</span>
-                </el-tooltip>
+                <div class="id-cell">
+                  <span class="id-text">#{{ row.id.substring(0, 8) }}...</span>
+                  <el-button type="primary" link size="small" @click="copyId(row.id)">
+                    <el-icon><CopyDocument /></el-icon>
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column prop="title" label="标题" min-width="200" />
+
+            <el-table-column prop="title" label="标题" min-width="220">
+              <template #default="{ row }">
+                <span class="title-text">{{ row.title }}</span>
+              </template>
+            </el-table-column>
+
             <el-table-column prop="total_amount" label="金额" width="150">
               <template #default="{ row }">
-                <span class="amount">¥{{ row.total_amount?.toFixed(2) }}</span>
+                <div class="amount-cell">
+                  <span class="currency">¥</span>
+                  <span class="amount-value">{{ formatAmount(row.total_amount) }}</span>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column prop="status" label="状态" width="100">
+
+            <el-table-column prop="status" label="状态" width="120">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)" size="small">
+                <el-tag
+                  :type="getStatusType(row.status)"
+                  size="default"
+                  effect="light"
+                  round
+                >
                   {{ getStatusText(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="created_at" label="创建时间" width="180" />
+
+            <el-table-column prop="created_at" label="创建时间" width="180">
+              <template #default="{ row }">
+                <span class="time-text">{{ formatDate(row.created_at) }}</span>
+              </template>
+            </el-table-column>
+
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
-                <el-button type="primary" link size="small" @click="viewDetail(row.id)">
-                  查看
-                </el-button>
+                <button class="detail-btn" @click="viewDetail(row.id)">
+                  <span>详情</span>
+                  <el-icon><View /></el-icon>
+                </button>
               </template>
             </el-table-column>
           </el-table>
-        </el-card>
-      </el-col>
-    </el-row>
+        </div>
+
+        <div class="table-footer" v-if="recentReimbursements.length > 0">
+          <span class="footer-info">显示 {{ recentReimbursements.length }} 条记录</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { getReimbursementsByUser } from '@/api/reimbursement'
+import {
+  getReimbursementsByUser
+} from '@/api/reimbursement'
+import {
+  Document,
+  Clock,
+  CircleCheck,
+  CircleClose,
+  Plus,
+  Checked,
+  Setting,
+  ArrowRight,
+  Top,
+  Bottom,
+  Sunny,
+  CopyDocument,
+  View
+} from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -136,16 +197,12 @@ const stats = ref({
   rejected: 0
 })
 
-const getStatusType = (status) => {
-  const typeMap = {
-    'pending_submission': 'info',
-    'pending': 'warning',
-    'auditing': 'primary',
-    'approved': 'success',
-    'rejected': 'danger'
-  }
-  return typeMap[status] || 'info'
-}
+const statCards = [
+  { key: 'total', label: '总报销单', icon: Document, trend: 12.5 },
+  { key: 'pending', label: '待审核', icon: Clock, trend: 8.2 },
+  { key: 'approved', label: '已通过', icon: CircleCheck, trend: 15.3 },
+  { key: 'rejected', label: '已驳回', icon: CircleClose, trend: -5.1 }
+]
 
 const getStatusText = (status) => {
   const textMap = {
@@ -156,6 +213,46 @@ const getStatusText = (status) => {
     'rejected': '已驳回'
   }
   return textMap[status] || status
+}
+
+const getStatusType = (status) => {
+  const typeMap = {
+    'pending_submission': 'info',
+    'pending': 'warning',
+    'auditing': 'warning',
+    'approved': 'success',
+    'rejected': 'danger'
+  }
+  return typeMap[status] || 'info'
+}
+
+const formatAmount = (amount) => {
+  if (!amount) return '0.00'
+  return Number(amount).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const copyId = async (id) => {
+  try {
+    await navigator.clipboard.writeText(id)
+    ElMessage.success('ID 已复制到剪贴板')
+  } catch (err) {
+    ElMessage.error('复制失败')
+  }
 }
 
 const viewDetail = (id) => {
@@ -169,9 +266,15 @@ const loadReimbursements = async () => {
 
     stats.value = {
       total: response.data?.total || 0,
-      pending: recentReimbursements.value.filter(r => r.status === 'pending' || r.status === 'auditing').length,
-      approved: recentReimbursements.value.filter(r => r.status === 'approved').length,
-      rejected: recentReimbursements.value.filter(r => r.status === 'rejected').length
+      pending: recentReimbursements.value.filter(r =>
+        r.status === 'pending' || r.status === 'auditing'
+      ).length,
+      approved: recentReimbursements.value.filter(r =>
+        r.status === 'approved'
+      ).length,
+      rejected: recentReimbursements.value.filter(r =>
+        r.status === 'rejected'
+      ).length
     }
   } catch (error) {
     console.error('加载报销单失败:', error)
@@ -184,200 +287,641 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 仪表盘容器 */
 .dashboard {
-  padding: 24px;
+  position: relative;
+  animation: fadeInUp var(--transition-normal);
 }
 
+/* 页面头部 */
 .page-header {
+  margin-bottom: var(--space-xl);
+}
+
+.header-content {
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl) var(--space-xl);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 32px;
-  padding: 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+  align-items: center;
+  gap: var(--space-xl);
+  position: relative;
+  overflow: hidden;
 }
 
-.header-left h1 {
+.header-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--accent-color));
+}
+
+.header-left {
+  flex: 1;
+}
+
+.welcome-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.08));
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin-bottom: var(--space-md);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.welcome-badge .el-icon {
+  font-size: 13px;
+}
+
+.greeting {
+  font-family: var(--font-display);
   font-size: 32px;
   font-weight: 700;
-  color: #fff;
-  margin: 0 0 8px 0;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-xs) 0 !important;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
 }
 
-.header-left p {
+.subtitle {
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-secondary);
   margin: 0;
+  font-weight: 400;
 }
 
 .header-right {
-  display: flex;
-  align-items: center;
-}
-
-.quick-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.quick-actions .el-button {
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-weight: 500;
-}
-
-.stats-row {
-  margin-bottom: 24px;
-}
-
-.stat-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-  border: 1px solid #e8e8e8;
-}
-
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
-.stat-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
   flex-shrink: 0;
 }
 
-.stat-icon.total {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+.action-group {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
 }
 
-.stat-icon.pending {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: #fff;
+/* 按钮样式 */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-md), 0 2px 8px var(--primary-glow);
+  font-family: inherit;
+  letter-spacing: 0.02em;
 }
 
-.stat-icon.approved {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  color: #fff;
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  background: linear-gradient(135deg, #7c94f4, #8b63b5);
 }
 
-.stat-icon.rejected {
-  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-  color: #fff;
+.btn-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  font-family: inherit;
 }
 
-.stat-content {
-  flex: 1;
-  min-width: 0;
+.btn-success:hover {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.4);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), 0 0 12px rgba(34, 197, 94, 0.25);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: #22c55e;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  margin-left: 4px;
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  font-family: inherit;
+}
+
+.btn-outline:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  transform: translateY(-2px);
+}
+
+/* 统计卡片区域 */
+.stats-section {
+  margin-bottom: var(--space-xl);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-lg);
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  transition: all var(--transition-normal);
+  animation: fadeInUp 0.5s ease-out both;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.stat-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+  border-color: transparent;
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+.stat-total {
+  --card-accent: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.stat-total::before {
+  background: var(--card-accent);
+}
+
+.stat-total:hover {
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.15);
+}
+
+.stat-pending {
+  --card-accent: linear-gradient(90deg, #f59e0b, #f97316);
+}
+
+.stat-pending::before {
+  background: var(--card-accent);
+}
+
+.stat-pending:hover {
+  box-shadow: 0 10px 30px rgba(245, 158, 11, 0.15);
+}
+
+.stat-approved {
+  --card-accent: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.stat-approved::before {
+  background: var(--card-accent);
+}
+
+.stat-approved:hover {
+  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.15);
+}
+
+.stat-rejected {
+  --card-accent: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.stat-rejected::before {
+  background: var(--card-accent);
+}
+
+.stat-rejected:hover {
+  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.15);
+}
+
+.card-header {
+  margin-bottom: var(--space-md);
+}
+
+.icon-wrapper {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  transition: all var(--transition-normal);
+}
+
+.icon-total {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.08));
+  color: var(--primary-color);
+}
+
+.icon-pending {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(249, 115, 22, 0.08));
+  color: #f59e0b;
+}
+
+.icon-approved {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(22, 163, 74, 0.08));
+  color: #22c55e;
+}
+
+.icon-rejected {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(220, 38, 38, 0.08));
+  color: #ef4444;
+}
+
+.stat-card:hover .icon-wrapper {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.card-body {
+  margin-bottom: var(--space-md);
 }
 
 .stat-value {
-  font-size: 36px;
+  font-family: var(--font-display);
+  font-size: 40px;
   font-weight: 700;
-  color: #2c3e50;
+  color: var(--text-primary);
   line-height: 1;
+  letter-spacing: -0.03em;
   margin-bottom: 6px;
 }
 
 .stat-label {
   font-size: 14px;
-  color: #7f8c8d;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
-.content-row {
-  margin-bottom: 20px;
+.card-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--divider);
 }
 
-.card-header {
+.trend-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.trend-indicator.up {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.trend-indicator.down {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.trend-indicator .el-icon {
+  font-size: 13px;
+}
+
+.trend-text {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+/* 内容网格 */
+.content-grid {
+  display: grid;
+  gap: var(--space-xl);
+}
+
+/* 表格卡片 */
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-normal);
+  animation: fadeInUp 0.6s ease-out 0.3s both;
+}
+
+.table-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.table-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--divider);
+  background: var(--background);
 }
 
-.card-title {
-  font-size: 18px;
+.header-left-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 20px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
+  margin: 0 !important;
+  letter-spacing: -0.01em;
 }
 
-.chart-card {
-  border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e8e8e8;
+.section-title .el-icon {
+  color: var(--primary-color);
+  font-size: 22px;
 }
 
-.chart-card :deep(.el-card__header) {
-  padding: 20px 24px;
-  border-bottom: 1px solid #f0f0f0;
+.section-subtitle {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin: 0;
+  font-weight: 400;
 }
 
-.chart-card :deep(.el-card__body) {
-  padding: 0;
+.view-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: var(--surface);
+  color: var(--primary-color);
+  border: 2px solid var(--primary-color);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  font-family: inherit;
 }
 
-.amount {
-  font-weight: 600;
-  color: #2c3e50;
+.view-all-btn:hover {
+  background: var(--primary-light);
+  box-shadow: var(--shadow-md), 0 0 12px var(--primary-glow);
+  transform: translateX(4px);
+}
+
+.view-all-btn .el-icon {
+  font-size: 14px;
+  transition: transform var(--transition-fast);
+}
+
+.view-all-btn:hover .el-icon {
+  transform: translateX(4px);
+}
+
+.table-container {
+  overflow-x: auto;
+  padding: 0 var(--space-md);
+}
+
+/* 自定义表格样式 */
+.custom-table {
+  --el-table-bg-color: transparent !important;
+  --el-table-tr-bg-color: transparent !important;
+  --el-table-header-bg-color: var(--background) !important;
+  --el-table-row-hover-bg-color: var(--primary-light) !important;
+  --el-table-border-color: var(--divider) !important;
+  --el-table-text-color: var(--text-secondary) !important;
+  --el-table-header-text-color: var(--text-primary) !important;
+}
+
+:deep(.el-table__header th) {
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-bottom: 2px solid var(--border) !important;
+  background: var(--background) !important;
+}
+
+:deep(.el-table__row) {
+  transition: all var(--transition-fast) !important;
+}
+
+:deep(.el-table__row:hover > td) {
+  background: var(--primary-light) !important;
+}
+
+:deep(.el-table__cell) {
+  border-bottom: 1px solid var(--divider) !important;
+  padding: 14px 12px !important;
+}
+
+/* ID 单元格 */
+.id-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .id-text {
-  font-family: 'Courier New', monospace;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
   font-size: 13px;
-  color: #606266;
+  color: var(--text-secondary);
+  letter-spacing: -0.01em;
 }
 
-@media (max-width: 768px) {
-  .dashboard {
-    padding: 16px;
-  }
+/* 标题单元格 */
+.title-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: block;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-  .page-header {
+/* 金额单元格 */
+.amount-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.currency {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.amount-value {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.time-text {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.detail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--primary-light);
+  color: var(--primary-color);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+}
+
+.detail-btn:hover {
+  background: rgba(102, 126, 234, 0.2);
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-sm), 0 0 12px var(--primary-glow);
+}
+
+.detail-btn .el-icon {
+  font-size: 12px;
+}
+
+/* 表格底部 */
+.table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md) var(--space-xl);
+  border-top: 1px solid var(--divider);
+  background: var(--background);
+}
+
+.footer-info {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .header-content {
     flex-direction: column;
-    gap: 20px;
-    padding: 20px;
+    align-items: flex-start;
+    gap: var(--space-lg);
   }
 
-  .page-header h1 {
-    font-size: 24px;
-  }
-
-  .quick-actions {
+  .action-group {
     width: 100%;
     flex-wrap: wrap;
   }
 
-  .quick-actions .el-button {
-    flex: 1;
-    min-width: 120px;
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    padding: var(--space-md);
   }
 
-  .stat-card {
-    padding: 20px;
+  .header-content {
+    padding: var(--space-lg);
   }
 
-  .stat-icon {
-    width: 56px;
-    height: 56px;
-    font-size: 28px;
+  .greeting {
+    font-size: 26px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 
   .stat-value {
-    font-size: 28px;
+    font-size: 32px;
+  }
+
+  .table-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-md);
+  }
+
+  .btn-primary,
+  .btn-success,
+  .btn-outline {
+    flex: 1;
+    min-width: 130px;
+    justify-content: center;
   }
 }
 </style>
