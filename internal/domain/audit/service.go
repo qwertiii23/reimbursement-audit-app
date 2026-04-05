@@ -131,17 +131,38 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 
 	if !rulePass {
 		audit.WorkflowStatus = WorkflowStatusRuleFailed
-		audit.Status = AuditStatusCompleted
-		audit.Reason = "规则校验未通过"
+		audit.UpdatedAt = time.Now()
+		s.repo.UpdateAudit(ctx, audit)
+
+		reimbursementInfo := s.buildReimbursementInfo(reimbursement)
+
+		audit.WorkflowStatus = WorkflowStatusRAGAudit
+		audit.UpdatedAt = time.Now()
+		s.repo.UpdateAudit(ctx, audit)
+
+		ragResult, err := s.executeRAGAnalysis(ctx, reimbursementInfo)
+		if err != nil {
+			s.logger.WithContext(ctx).Error("RAG分析失败", logger.NewField("error", err))
+			audit.RAGPass = false
+		} else {
+			audit.RAGResults = ragResult
+			audit.RAGPass = ragResult != nil && ragResult.Confidence > 0.6
+		}
+
 		audit.FinalPass = false
-		audit.RAGPass = false
-		audit.RiskScore = 1.0
-		audit.RiskLevel = "高风险"
+		audit.Reason = "规则校验未通过"
+		audit.RiskScore = s.calculateRiskScore(audit)
+		audit.RiskLevel = s.determineRiskLevel(audit.RiskScore)
+		audit.Suggestions = s.generateSuggestions(audit)
 		completedTime := time.Now()
 		audit.CompletedAt = &completedTime
 		audit.Duration = completedTime.Sub(startTime).Milliseconds()
 		audit.UpdatedAt = completedTime
-		s.repo.UpdateAudit(ctx, audit)
+
+		if err := s.repo.UpdateAudit(ctx, audit); err != nil {
+			s.logger.WithContext(ctx).Error("更新审核记录失败", logger.NewField("error", err))
+			return nil, fmt.Errorf("更新审核记录失败: %w", err)
+		}
 
 		reimbursement.Status = "rejected"
 		if err := s.reimbursementRepo.UpdateReimbursement(ctx, reimbursement); err != nil {
@@ -158,7 +179,9 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 			Reason:          &audit.Reason,
 			CreatedAt:       completedTime,
 		}
-		s.repo.CreateFlowLog(ctx, failFlowLog)
+		if err := s.repo.CreateFlowLog(ctx, failFlowLog); err != nil {
+			s.logger.WithContext(ctx).Error("创建流程日志失败", logger.NewField("error", err))
+		}
 
 		return audit, nil
 	}
@@ -343,16 +366,18 @@ func (s *Service) executeRuleValidation(ctx context.Context, reimbursement *reim
 		}
 
 		for _, result := range results {
-			allResults = append(allResults, &RuleValidationResult{
-				RuleID:        result.RuleID,
-				RuleCode:      result.RuleID,
-				RuleName:      result.RuleName,
-				RuleType:      result.RuleType,
-				Passed:        result.Passed,
-				Message:       result.Message,
-				Details:       map[string]interface{}{"details": result.Details, "invoice_id": invoice.ID},
-				ExecutionTime: result.ExecutionTime,
-			})
+			if !result.Passed {
+				allResults = append(allResults, &RuleValidationResult{
+					RuleID:        result.RuleID,
+					RuleCode:      result.RuleID,
+					RuleName:      result.RuleName,
+					RuleType:      result.RuleType,
+					Passed:        result.Passed,
+					Message:       result.Message,
+					Details:       map[string]interface{}{"details": result.Details, "invoice_id": invoice.ID},
+					ExecutionTime: result.ExecutionTime,
+				})
+			}
 		}
 	}
 
