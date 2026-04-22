@@ -129,89 +129,116 @@ func (p *TencentProvider) imageToBase64(imagePath string) (string, error) {
 
 // parseResponse 解析OCR响应
 func (p *TencentProvider) parseResponse(response *tccr.VatInvoiceOCRResponse) (*ocr.InvoiceInfo, error) {
-	// 创建发票信息结构体
 	invoiceInfo := &ocr.InvoiceInfo{
 		ParseTime: time.Now(),
 		IsValid:   true,
 		RawText:   p.getRawText(response),
 	}
 
-	if response.Response.VatInvoiceInfos != nil {
-		for i, item := range response.Response.VatInvoiceInfos {
-			if item.Name != nil && item.Value != nil {
-				p.logger.Info("解析OCR响应",
-					logger.NewField("index", i),
-					logger.NewField("value", *item.Value))
+	if response.Response.VatInvoiceInfos == nil {
+		p.logger.Warn("VatInvoiceInfos为空")
+		return invoiceInfo, nil
+	}
+
+	items := make([]ocr.InvoiceItem, 0)
+	var currentItem *ocr.InvoiceItem
+
+	for _, item := range response.Response.VatInvoiceInfos {
+		if item.Name == nil || item.Value == nil {
+			continue
+		}
+
+		name := *item.Name
+		value := *item.Value
+
+		switch name {
+		case "发票号码":
+			invoiceInfo.InvoiceNumber = value
+		case "发票类型":
+			invoiceInfo.InvoiceType = value
+		case "发票名称":
+			invoiceInfo.InvoiceName = value
+		case "开票日期":
+			invoiceInfo.InvoiceDate = value
+		case "合计金额":
+			invoiceInfo.TotalAmount = p.parseFloat(value)
+		case "合计税额":
+			invoiceInfo.TaxAmount = p.parseFloat(value)
+		case "价税合计(小写)":
+			invoiceInfo.TotalWithTax = p.parseFloat(value)
+		case "价税合计(大写)":
+			invoiceInfo.TotalAmountInWords = value
+		case "购买方名称":
+			invoiceInfo.BuyerName = value
+		case "购买方统一社会信用代码/纳税人识别号", "购买方识别号":
+			invoiceInfo.BuyerTaxNumber = value
+		case "销售方名称":
+			invoiceInfo.SellerName = value
+		case "销售方统一社会信用代码/纳税人识别号", "销售方识别号":
+			invoiceInfo.SellerTaxNumber = value
+		case "校验码":
+			invoiceInfo.CheckCode = value
+		case "密码区":
+			invoiceInfo.PasswordArea = value
+		case "开票人":
+			invoiceInfo.Drawer = value
+		case "小计金额":
+			invoiceInfo.SubtotalAmount = p.parseFloat(value)
+		case "小计税额":
+			invoiceInfo.SubtotalTax = p.parseFloat(value)
+		case "备注":
+			invoiceInfo.Remarks = value
+
+		case "货物或应税劳务名称", "商品名称", "项目名称":
+			if currentItem != nil && currentItem.Name != "" {
+				items = append(items, *currentItem)
+			}
+			currentItem = &ocr.InvoiceItem{
+				Name:  value,
+				LineNo: len(items),
+			}
+		case "规格型号", "规格":
+			if currentItem != nil {
+				currentItem.Specification = value
+			}
+		case "单位":
+			if currentItem != nil {
+				currentItem.Unit = value
+			}
+		case "数量":
+			if currentItem != nil {
+				currentItem.Quantity = p.parseFloat(value)
+			}
+		case "单价":
+			if currentItem != nil {
+				currentItem.UnitPrice = p.parseFloat(value)
+			}
+		case "金额", "不含税金额", "不含税价":
+			if currentItem != nil {
+				currentItem.AmountWithoutTax = p.parseFloat(value)
+			}
+		case "税率":
+			if currentItem != nil {
+				taxRateStr := strings.TrimSuffix(value, "%")
+				currentItem.TaxRate = p.parseFloat(taxRateStr)
+			}
+		case "税额":
+			if currentItem != nil {
+				currentItem.TaxAmount = p.parseFloat(value)
 			}
 		}
 	}
 
-	// 解析发票基本信息
-	if response.Response.VatInvoiceInfos != nil {
-		for _, item := range response.Response.VatInvoiceInfos {
-			if item.Name != nil && item.Value != nil {
-				name := *item.Name
-				value := *item.Value
-
-				switch name {
-				case "发票号码":
-					invoiceInfo.InvoiceNumber = value
-				case "发票类型":
-					invoiceInfo.InvoiceType = value
-				case "发票名称":
-					invoiceInfo.InvoiceName = value
-				case "开票日期":
-					invoiceInfo.InvoiceDate = value
-				case "合计金额":
-					invoiceInfo.TotalAmount = p.parseFloat(value)
-				case "合计税额":
-					invoiceInfo.TaxAmount = p.parseFloat(value)
-				case "价税合计(小写)":
-					invoiceInfo.TotalWithTax = p.parseFloat(value)
-				case "价税合计(大写)":
-					invoiceInfo.TotalAmountInWords = value
-				case "购买方名称":
-					invoiceInfo.BuyerName = value
-				case "购买方统一社会信用代码/纳税人识别号", "购买方识别号":
-					invoiceInfo.BuyerTaxNumber = value
-				case "销售方名称":
-					invoiceInfo.SellerName = value
-				case "销售方统一社会信用代码/纳税人识别号", "销售方识别号":
-					invoiceInfo.SellerTaxNumber = value
-				case "校验码":
-					invoiceInfo.CheckCode = value
-				case "密码区":
-					invoiceInfo.PasswordArea = value
-				case "开票人":
-					invoiceInfo.Drawer = value
-				case "小计金额":
-					invoiceInfo.SubtotalAmount = p.parseFloat(value)
-				case "小计税额":
-					invoiceInfo.SubtotalTax = p.parseFloat(value)
-				case "备注":
-					invoiceInfo.Remarks = value
-				}
-			}
-		}
+	if currentItem != nil && currentItem.Name != "" {
+		items = append(items, *currentItem)
 	}
 
-	//p.logger.Info("解析OCR响应",
-	//	logger.NewField("invoice_number", invoiceInfo.InvoiceNumber),
-	//	logger.NewField("invoice_type", invoiceInfo.InvoiceType),
-	//	logger.NewField("invoice_date", invoiceInfo.InvoiceDate),
-	//	logger.NewField("total_amount", invoiceInfo.TotalAmount),
-	//	logger.NewField("tax_amount", invoiceInfo.TaxAmount),
-	//	logger.NewField("total_with_tax", invoiceInfo.TotalWithTax),
-	//	logger.NewField("buyer_name", invoiceInfo.BuyerName),
-	//	logger.NewField("buyer_tax_number", invoiceInfo.BuyerTaxNumber),
-	//	logger.NewField("seller_name", invoiceInfo.SellerName),
-	//	logger.NewField("seller_tax_number", invoiceInfo.SellerTaxNumber),
-	//	logger.NewField("check_code", invoiceInfo.CheckCode),
-	//	logger.NewField("password_area", invoiceInfo.PasswordArea),
-	//	logger.NewField("is_valid", invoiceInfo.IsValid),
-	//	logger.NewField("error_message", invoiceInfo.ErrorMessage),
-	//	logger.NewField("raw_text", invoiceInfo.RawText),
-	//	logger.NewField("parse_time", invoiceInfo.ParseTime))
+	if len(items) > 0 {
+		invoiceInfo.Items = items
+		p.logger.Info("成功提取商品明细",
+			logger.NewField("items_count", len(items)),
+			logger.NewField("first_item_name", items[0].Name))
+	}
 
 	return invoiceInfo, nil
 }

@@ -68,6 +68,7 @@ func (s *ReimbursementApplicationService) CreateReimbursement(ctx context.Contex
 		UserName:    req.UserName,
 		Department:  req.Department,
 		Category:    req.Category,
+		Title:       req.Title,
 		Reason:      req.Reason,
 		Description: req.Description,
 		TotalAmount: req.TotalAmount,

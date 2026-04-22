@@ -1,0 +1,16 @@
+{
+  "invoice_data": {
+    "city_name": "上海",
+    "employee_level": "普通员工",
+    "check_in_date": "2026-11-06",
+    "check_out_date": "2026-11-08",
+    "amount": 1800.00,
+    "nights": 2,
+    "invoice_type": "增值税普通发票",
+    "invoice_code": "123456789012",
+    "invoice_number": "12345678",
+    "invoice_date": "2026-11-07",
+    "merchant_type": "一般纳税人",
+    "commodity_name": "住宿费"
+  }
+}

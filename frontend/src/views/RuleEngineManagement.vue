@@ -2,7 +2,7 @@
   <div class="rule-engine-container">
     <div class="header">
       <h2>规则引擎管理</h2>
-      <el-button type="primary" @click="handleAddRule">
+      <el-button v-if="isAdmin" type="primary" @click="handleAddRule">
         <el-icon><Plus /></el-icon>
         新增规则
       </el-button>
@@ -63,10 +63,11 @@
             <el-button link type="primary" size="small" @click="handleViewRule(row)">
               查看
             </el-button>
-            <el-button link type="primary" size="small" @click="handleEditRule(row)">
+            <el-button v-if="isAdmin" link type="primary" size="small" @click="handleEditRule(row)">
               编辑
             </el-button>
             <el-button 
+              v-if="isAdmin"
               link 
               :type="row.enabled ? 'warning' : 'success'" 
               size="small" 
@@ -74,7 +75,7 @@
             >
               {{ row.enabled ? '下线' : '上线' }}
             </el-button>
-            <el-popconfirm title="确定要删除此规则吗？" @confirm="handleDeleteRule(row.id)">
+            <el-popconfirm v-if="isAdmin" title="确定要删除此规则吗？" @confirm="handleDeleteRule(row.id)">
               <template #reference>
                 <el-button link type="danger" size="small">删除</el-button>
               </template>
@@ -277,11 +278,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Search } from '@element-plus/icons-vue'
-import axios from 'axios'
+import request from '@/utils/request'
 import ConditionGroup from '@/components/ConditionGroup.vue'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.isAdmin)
 
 const loading = ref(false)
 const saving = ref(false)
@@ -342,12 +347,12 @@ const fetchRules = async () => {
       name: searchKeyword.value,
       enabled: statusFilter.value === 'enabled' ? true : statusFilter.value === 'disabled' ? false : undefined
     }
-    const res = await axios.get('/api/v1/engine/rules', { params })
-    if (res.data.code === 200) {
-      ruleList.value = res.data.data.rules || []
-      pagination.total = res.data.data.total || 0
+    const res = await request.get('/engine/rules', { params })
+    if (res.code === 200) {
+      ruleList.value = res.data.rules || []
+      pagination.total = res.data.total || 0
     } else {
-      ElMessage.error(res.data.message || '获取规则列表失败')
+      ElMessage.error(res.message || '获取规则列表失败')
     }
   } catch (error) {
     ElMessage.error('获取规则列表失败')
@@ -358,11 +363,11 @@ const fetchRules = async () => {
 
 const fetchFeatures = async () => {
   try {
-    const res = await axios.get('/api/v1/engine/features', {
+    const res = await request.get('/engine/features', {
       params: { page: 1, size: 100 }
     })
-    if (res.data.code === 200) {
-      features.value = res.data.data.features || []
+    if (res.code === 200) {
+      features.value = res.data.features || []
       console.log('获取到的特征列表:', features.value)
     }
   } catch (error) {
@@ -425,12 +430,12 @@ const handleEditRule = async (rule) => {
 
 const handleViewRule = async (rule) => {
   try {
-    const res = await axios.get(`/api/v1/engine/rules/${rule.id}`)
-    if (res.data.code === 200) {
-      currentRule.value = JSON.parse(JSON.stringify(res.data.data.rule))
+    const res = await request.get(`/engine/rules/${rule.id}`)
+    if (res.code === 200) {
+      currentRule.value = JSON.parse(JSON.stringify(res.data.rule))
       viewDialogVisible.value = true
     } else {
-      ElMessage.error(res.data.message || '获取规则详情失败')
+      ElMessage.error(res.message || '获取规则详情失败')
     }
   } catch (error) {
     ElMessage.error('获取规则详情失败')
@@ -451,7 +456,7 @@ const handleToggleStatus = async (rule) => {
       type: 'warning'
     })
     
-    await axios.put(`/api/v1/engine/rules/${rule.id}/toggle`)
+    await request.put(`/engine/rules/${rule.id}/toggle`)
     ElMessage.success(`${action}成功`)
     fetchRules()
   } catch (error) {
@@ -463,7 +468,7 @@ const handleToggleStatus = async (rule) => {
 
 const handleDeleteRule = async (id) => {
   try {
-    await axios.delete(`/api/v1/engine/rules/${id}`)
+    await request.delete(`/engine/rules/${id}`)
     ElMessage.success('删除成功')
     fetchRules()
   } catch (error) {
@@ -566,10 +571,10 @@ const handleSaveRule = async () => {
     }
 
     if (ruleForm.id) {
-      await axios.put(`/api/v1/engine/rules/${ruleForm.id}`, data)
+      await request.put(`/engine/rules/${ruleForm.id}`, data)
       ElMessage.success('更新成功')
     } else {
-      await axios.post('/api/v1/engine/rules', data)
+      await request.post('/engine/rules', data)
       ElMessage.success('创建成功')
     }
 

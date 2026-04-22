@@ -358,6 +358,7 @@ const handleCreate = async () => {
         formData.append('user_name', userStore.user.real_name || userStore.user.username || '未知用户')
         formData.append('total_amount', createForm.amount.toString())
         formData.append('category', createForm.category)
+        formData.append('title', createForm.title)
         formData.append('reason', createForm.reason)
         formData.append('expense_date', createForm.expense_date)
         formData.append('description', createForm.description)

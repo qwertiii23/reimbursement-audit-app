@@ -1,0 +1,10 @@
+{
+  "invoice_data": {
+    "city_name": "上海",
+    "employee_level": "普通员工",
+    "check_in_date": "2026-11-06",
+    "check_out_date": "2026-11-08",
+    "amount": 1800.00,
+    "nights": 2
+  }
+}

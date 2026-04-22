@@ -22,7 +22,7 @@ database:
   host: "localhost"
   port: 3306
   username: "root"
-  password: "Ljq20040811."
+  password: ""  # 从环境变量获取
   dbname: "reimbursement_audit"
   charset: "utf8mb4"
   collation: "utf8mb4_unicode_ci"
@@ -65,8 +65,8 @@ storage:
 # OCR配置
 ocr:
   provider: "tencent"
-  secret_id: "AKID6FPOExZ3NB2471tZ5bxAC4kFZgcNyNab"
-  secret_key: "98xc7TedT9dv0tc9T2QcvAJNM995qRq"
+  secret_id: ""  # 从环境变量获取
+  secret_key: ""  # 从环境变量获取
   region: "ap-beijing"
   timeout: 30
   max_retries: 3
@@ -74,7 +74,7 @@ ocr:
 # LLM配置
 llm:
   provider: "deepseek"
-  api_key: "sk-61bb8de8c1234a368c3cb5e3609b2d20"
+  api_key: ""  # 从环境变量获取
   base_url: "https://api.deepseek.com/v1"
   model: "deepseek-chat"
   max_tokens: 2000
@@ -87,16 +87,16 @@ rag:
   enabled: true
   # 对话模型
   model: "deepseek-chat"
-  api_key: "${DEEPSEEK_API_KEY}"  # 从环境变量获取
+  api_key: ""  # 从环境变量获取
   api_base: "https://api.deepseek.com/v1"
   max_tokens: 1000
   temperature: 0.7
   # 向量化模型配置（使用智谱AI）
   embedding_provider: "zhipu"
-  embedding_model: "embedding-3"
-  embedding_api_key: "d1f2189e1e6c45fbb522481a0f32437c.tvBH9rduuRgWgxEu"
+  embedding_model: "embedding-2"
+  embedding_api_key: ""  # 从环境变量获取
   embedding_api_base: "https://open.bigmodel.cn/api/paas/v4"
-  embedding_dimension: 768
+  embedding_dimension: 1024
 
 # 认证配置
 auth:
@@ -154,6 +154,6 @@ postgres:
   host: "localhost"
   port: 5432
   username: "postgres"
-  password: "${POSTGRES_PASSWORD}"  # 从环境变量获取
+  password: ""  # 从环境变量获取
   dbname: "reimbursement_audit"
   sslmode: "disable"

@@ -217,13 +217,16 @@ func (s *RuleEngineService) CreateFeature(ctx context.Context, req *CreateFeatur
 	}
 
 	feature := &Feature{
-		ID:        uuid.New().String(),
-		Name:      req.Name,
-		Code:      req.Code,
-		Type:      req.Type,
-		ValueType: req.ValueType,
-		Category:  req.Category,
-		Enabled:   req.Enabled,
+		ID:             uuid.New().String(),
+		Name:           req.Name,
+		Code:           req.Code,
+		Description:    req.Description,
+		Type:           req.Type,
+		ValueType:      req.ValueType,
+		Category:       req.Category,
+		Enabled:        req.Enabled,
+		FunctionName:   req.FunctionName,
+		FunctionConfig: req.FunctionConfig,
 	}
 
 	if err := s.featureRepo.CreateFeature(ctx, feature); err != nil {
@@ -265,6 +268,9 @@ func (s *RuleEngineService) UpdateFeature(ctx context.Context, req *UpdateFeatur
 	feature.ValueType = req.ValueType
 	feature.Category = req.Category
 	feature.Enabled = req.Enabled
+	feature.FunctionName = req.FunctionName
+	feature.FunctionConfig = req.FunctionConfig
+	feature.Description = req.Description
 
 	if err := s.featureRepo.UpdateFeature(ctx, feature); err != nil {
 		return nil, err
@@ -506,63 +512,69 @@ func (s *RuleEngineService) ExecuteAllRules(ctx context.Context, data interface{
 }
 
 type CreateRuleRequest struct {
-	Name        string
-	Description string
-	Conditions  []ConditionRequest
-	Decision    DecisionRequest
-	Priority    int
-	Enabled     bool
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Conditions  []ConditionRequest `json:"conditions"`
+	Decision    DecisionRequest    `json:"decision"`
+	Priority    int                `json:"priority"`
+	Enabled     bool               `json:"enabled"`
 }
 
 type UpdateRuleRequest struct {
-	ID          string
-	Name        string
-	Description string
-	Conditions  []ConditionRequest
-	Decision    DecisionRequest
-	Priority    int
-	Enabled     bool
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Conditions  []ConditionRequest `json:"conditions"`
+	Decision    DecisionRequest    `json:"decision"`
+	Priority    int                `json:"priority"`
+	Enabled     bool               `json:"enabled"`
 }
 
 type ConditionRequest struct {
-	FeatureID string
-	Operator  string
-	Value     string
-	LogicOp   string
-	SortOrder int
+	FeatureID string `json:"feature_id"`
+	Operator  string `json:"operator"`
+	Value     string `json:"value"`
+	LogicOp   string `json:"logic_op"`
+	SortOrder int    `json:"sort_order"`
 }
 
 type DecisionRequest struct {
-	Type   string
-	Reason string
+	Type   string `json:"type"`
+	Reason string `json:"reason"`
 }
 
 type CreateFeatureRequest struct {
-	Name      string
-	Code      string
-	Type      string
-	ValueType string
-	Category  string
-	Enabled   bool
-	Values    []FeatureValueRequest
+	Name           string                `json:"name"`
+	Code           string                `json:"code"`
+	Description    string                `json:"description"`
+	Type           string                `json:"type"`
+	ValueType      string                `json:"value_type"`
+	Category       string                `json:"category"`
+	Enabled        bool                  `json:"enabled"`
+	FunctionName   string                `json:"function_name"`
+	FunctionConfig FeatureConfig         `json:"function_config"`
+	Values         []FeatureValueRequest `json:"values"`
 }
 
 type UpdateFeatureRequest struct {
-	ID        string
-	Name      string
-	Code      string
-	Type      string
-	ValueType string
-	Category  string
-	Enabled   bool
-	Values    []FeatureValueRequest
+	ID             string                `json:"id"`
+	Name           string                `json:"name"`
+	Code           string                `json:"code"`
+	Description    string                `json:"description"`
+	Type           string                `json:"type"`
+	ValueType      string                `json:"value_type"`
+	Category       string                `json:"category"`
+	Enabled        bool                  `json:"enabled"`
+	FunctionName   string                `json:"function_name"`
+	FunctionConfig FeatureConfig         `json:"function_config"`
+	Values         []FeatureValueRequest `json:"values"`
 }
 
 type FeatureValueRequest struct {
-	Value     string
-	Label     string
-	SortOrder int
-	Enabled   bool
+	Value     string `json:"value"`
+	Label     string `json:"label"`
+	SortOrder int    `json:"sort_order"`
+	Enabled   bool   `json:"enabled"`
 }
 
 type RuleEvaluationResult struct {

@@ -76,44 +76,20 @@
                       type="primary"
                       link
                       size="small"
-                      @click="toggleInvoiceDetail(invoice.id)"
+                      @click="openInvoiceDetailDialog(invoice)"
                     >
-                      {{ expandedInvoices[invoice.id] ? '收起' : '详情' }}
-                    </el-button>
-                    <el-button
-                      type="primary"
-                      link
-                      size="small"
-                      @click="triggerOCR(invoice.id)"
-                      v-if="!invoice.ocr_result"
-                    >
-                      OCR识别
+                      详情
                     </el-button>
                     <el-button
                       type="warning"
                       link
                       size="small"
                       @click="handleUpdateInvoiceImage(invoice.id)"
-                      v-if="reimbursement.status === 'pending'"
+                      v-if="reimbursement.status === 'pending_submission' || reimbursement.status === 'pending'"
                     >
                       更换图片
                     </el-button>
                   </div>
-                </div>
-                <div class="invoice-ocr-detail" v-if="expandedInvoices[invoice.id] && invoice.ocr_result">
-                  <el-descriptions :column="2" border size="small">
-                    <el-descriptions-item label="发票类型">{{ invoice.type }}</el-descriptions-item>
-                    <el-descriptions-item label="发票号码">{{ invoice.number }}</el-descriptions-item>
-                    <el-descriptions-item label="发票日期">{{ invoice.date }}</el-descriptions-item>
-                    <el-descriptions-item label="发票金额">¥{{ invoice.amount?.toFixed(2) }}</el-descriptions-item>
-                    <el-descriptions-item label="税额">¥{{ invoice.tax_amount?.toFixed(2) }}</el-descriptions-item>
-                    <el-descriptions-item label="购买方">{{ invoice.buyer_name }}</el-descriptions-item>
-                    <el-descriptions-item label="销售方">{{ invoice.seller_name }}</el-descriptions-item>
-                    <el-descriptions-item label="商品名称">{{ invoice.commodity_name }}</el-descriptions-item>
-                    <el-descriptions-item label="数量">{{ invoice.quantity }}</el-descriptions-item>
-                    <el-descriptions-item label="单价">¥{{ invoice.price?.toFixed(2) }}</el-descriptions-item>
-                    <el-descriptions-item label="类别" :span="2">{{ invoice.category }} / {{ invoice.sub_category }}</el-descriptions-item>
-                  </el-descriptions>
                 </div>
               </div>
             </el-col>
@@ -155,7 +131,7 @@
             >
               <div class="timeline-content">
                 <div class="timeline-title">规则审核</div>
-                <div class="timeline-desc" v-if="auditResult">
+                <div class="timeline-desc" v-if="auditResult && auditResult.rule_pass !== undefined">
                   <el-tag :type="auditResult.rule_pass ? 'success' : 'danger'" size="small">
                     {{ auditResult.rule_pass ? '通过' : '失败' }}
                   </el-tag>
@@ -170,7 +146,7 @@
             >
               <div class="timeline-content">
                 <div class="timeline-title">AI审核</div>
-                <div class="timeline-desc">
+                <div class="timeline-desc" v-if="auditResult && auditResult.rag_pass !== undefined">
                   <el-tag :type="auditResult.rag_pass ? 'success' : 'danger'" size="small">
                     {{ auditResult.rag_pass ? '通过' : '失败' }}
                   </el-tag>
@@ -185,10 +161,11 @@
             >
               <div class="timeline-content">
                 <div class="timeline-title">人工审核</div>
-                <div class="timeline-desc" v-if="auditStatus?.workflow_status && (auditStatus.workflow_status === '人工审核通过' || auditStatus.workflow_status === '人工审核驳回')">
-                  <el-tag :type="auditStatus.workflow_status === '人工审核通过' ? 'success' : 'danger'" size="small">
-                    {{ auditStatus.workflow_status === '人工审核通过' ? '通过' : '驳回' }}
-                  </el-tag>
+                <div class="timeline-desc" v-if="auditStatus?.workflow_status === '人工审核通过'">
+                  <el-tag type="success" size="small">通过</el-tag>
+                </div>
+                <div class="timeline-desc" v-else-if="auditStatus?.workflow_status === '人工审核驳回'">
+                  <el-tag type="danger" size="small">驳回</el-tag>
                 </div>
               </div>
             </el-timeline-item>
@@ -234,6 +211,13 @@
                 <div class="rule-message">{{ result.message }}</div>
               </div>
             </div>
+
+            <div v-if="auditResult.rag_results" class="rag-results">
+              <el-button type="primary" @click="showRAGDialog = true" style="width: 100%">
+                <el-icon><Document /></el-icon>
+                查看AI智能审核详情
+              </el-button>
+            </div>
           </div>
         </el-card>
 
@@ -261,8 +245,31 @@
               <el-icon><Edit /></el-icon>
               编辑报销单
             </el-button>
+
+            <div v-if="isAdmin && reimbursement.status === 'auditing' && auditStatus?.workflow_status === '待人工审核'" class="manual-audit-section">
+              <div class="manual-audit-title">人工审核</div>
+              <div class="manual-audit-buttons">
+                <el-button 
+                  type="success" 
+                  @click="handleManualApprove" 
+                  :loading="manualAuditLoading"
+                >
+                  <el-icon><CircleCheck /></el-icon>
+                  通过
+                </el-button>
+                <el-button 
+                  type="danger" 
+                  @click="handleManualReject" 
+                  :loading="manualAuditLoading"
+                >
+                  <el-icon><CircleClose /></el-icon>
+                  驳回
+                </el-button>
+              </div>
+            </div>
+
             <el-button 
-              v-if="reimbursement.status === 'auditing'"
+              v-if="reimbursement.status === 'auditing' && auditStatus?.workflow_status !== '待人工审核'"
               type="warning"
               @click="handleWithdrawAudit" 
               style="width: 100%; margin-top: 10px"
@@ -309,6 +316,80 @@
       <el-image :src="previewImageUrl" fit="contain" style="width: 100%" />
     </el-dialog>
 
+    <el-dialog v-model="invoiceDetailDialog" title="发票详情" width="700px">
+      <div v-if="currentInvoice" class="invoice-detail-content">
+        <div class="invoice-image-preview">
+          <el-image 
+            :src="getImageUrl(currentInvoice.image_path)" 
+            fit="contain"
+            style="width: 100%; max-height: 400px;"
+          >
+            <template #error>
+              <div class="image-error">
+                <el-icon><Picture /></el-icon>
+                <span>图片加载失败</span>
+              </div>
+            </template>
+          </el-image>
+        </div>
+        
+        <el-divider />
+        
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="发票类型">
+            {{ currentInvoice.type || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="发票号码">
+            {{ currentInvoice.number || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="发票日期">
+            {{ currentInvoice.date || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="发票金额">
+            <span class="amount-text">¥{{ currentInvoice.amount?.toFixed(2) || '0.00' }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="税额">
+            ¥{{ currentInvoice.tax_amount?.toFixed(2) || '0.00' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="价税合计">
+            <span class="amount-text">¥{{ currentInvoice.total_amount?.toFixed(2) || '0.00' }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="购买方" :span="2">
+            {{ currentInvoice.buyer_name || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="销售方" :span="2">
+            {{ currentInvoice.seller_name || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="商品名称" :span="2">
+            {{ currentInvoice.commodity_name || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="规格型号">
+            {{ currentInvoice.specification || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="单位">
+            {{ currentInvoice.unit || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="数量">
+            {{ currentInvoice.quantity || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="单价">
+            ¥{{ currentInvoice.price?.toFixed(2) || '0.00' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="报销类别" :span="2">
+            {{ currentInvoice.category || '未识别' }} / {{ currentInvoice.sub_category || '未识别' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="OCR状态" :span="2">
+            <el-tag :type="currentInvoice.ocr_result ? 'success' : 'info'" size="default">
+              {{ currentInvoice.ocr_result ? '已识别' : '待识别' }}
+            </el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+      <template #footer>
+        <el-button @click="invoiceDetailDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="showUpdateImageDialog" title="更换图片" width="500px">
       <el-upload
         ref="updateImageRef"
@@ -326,38 +407,144 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="showRAGDialog" title="AI智能审核详情" width="700px" top="5vh">
+      <div class="rag-dialog-content" v-if="parsedRAGResult">
+        <div class="rag-header">
+          <div class="rag-conclusion" :class="parsedRAGResult.conclusion === '驳回' ? 'reject' : 'pass'">
+            <el-icon size="20">
+              <CircleClose v-if="parsedRAGResult.conclusion === '驳回'" />
+              <CircleCheck v-else />
+            </el-icon>
+            <span>审核结论：{{ parsedRAGResult.conclusion }}</span>
+          </div>
+          <div class="rag-confidence" v-if="parsedRAGResult.confidence">
+            <span class="label">置信度：</span>
+            <el-progress 
+              :percentage="Math.round(parsedRAGResult.confidence * 100)" 
+              :color="parsedRAGResult.confidence > 0.7 ? '#67c23a' : '#e6a23c'"
+              :stroke-width="10"
+              style="width: 150px"
+            />
+          </div>
+        </div>
+
+        <el-divider />
+
+        <div class="rag-section" v-if="parsedRAGResult.reasoning">
+          <div class="rag-section-title">
+            <el-icon><Warning /></el-icon>
+            审核理由
+          </div>
+          <div class="rag-reasoning">
+            <p>{{ parsedRAGResult.reasoning }}</p>
+          </div>
+        </div>
+
+        <div class="rag-section" v-else-if="parsedRAGResult.reasons && parsedRAGResult.reasons.length > 0">
+          <div class="rag-section-title">
+            <el-icon><Warning /></el-icon>
+            审核理由
+          </div>
+          <div class="rag-reasons">
+            <div v-for="(reason, index) in parsedRAGResult.reasons" :key="index" class="reason-item">
+              <div class="reason-number">{{ index + 1 }}</div>
+              <div class="reason-content">
+                <div class="reason-title" v-if="reason.title">{{ reason.title }}</div>
+                <div class="reason-text">{{ reason.text }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rag-section" v-if="parsedRAGResult.suggestions && parsedRAGResult.suggestions.length > 0">
+          <div class="rag-section-title">
+            <el-icon><InfoFilled /></el-icon>
+            处理建议
+          </div>
+          <div class="rag-suggestions">
+            <div v-for="(suggestion, index) in parsedRAGResult.suggestions" :key="index" class="suggestion-item">
+              <el-icon><Right /></el-icon>
+              <span>{{ suggestion }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="rag-section" v-if="parsedRAGResult.rawContent">
+          <div class="rag-section-title collapsible" @click="toggleRawContent">
+            <el-icon><Document /></el-icon>
+            完整分析报告
+            <el-icon class="toggle-icon" :class="{ expanded: showRawContent }"><ArrowDown /></el-icon>
+          </div>
+          <div class="rag-raw-content" v-show="showRawContent">
+            <pre>{{ parsedRAGResult.rawContent }}</pre>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showRAGDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showRejectDialog" title="审核驳回" width="500px">
+      <el-form label-width="80px">
+        <el-form-item label="驳回原因">
+          <el-input
+            v-model="rejectReason"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入驳回原因（可选）"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showRejectDialog = false">取消</el-button>
+        <el-button type="danger" @click="confirmReject" :loading="manualAuditLoading">
+          确认驳回
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Refresh, Back } from '@element-plus/icons-vue'
+import { ArrowLeft, Refresh, Back, Document, CircleCheck, CircleClose, Warning, InfoFilled, Right, ArrowDown } from '@element-plus/icons-vue'
 import {
   getReimbursementById,
   uploadInvoice,
   triggerOCR as triggerOCRApi,
   updateInvoiceImage as updateInvoiceImageApi
 } from '@/api/reimbursement'
-import { startAudit as startAuditApi, getAuditResult, getAuditStatus, getFlowLogs, getFlowLogsByReimbursementId, withdrawAudit } from '@/api/audit'
+import { startAudit as startAuditApi, getAuditResult, getAuditStatus, getFlowLogs, getFlowLogsByReimbursementId, withdrawAudit, manualAudit } from '@/api/audit'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const reimbursement = ref({})
 const invoices = ref([])
+const showRAGDialog = ref(false)
+const showRawContent = ref(false)
 const auditResult = ref(null)
+const isAdmin = computed(() => userStore.isAdmin)
 const auditStatus = ref(null)
 const flowLogs = ref([])
-const expandedInvoices = ref({})
 const refreshing = ref(false)
 const loadingFlowLogs = ref(false)
+const manualAuditLoading = ref(false)
+const showRejectDialog = ref(false)
+const rejectReason = ref('')
 
 const showUploadDialog = ref(false)
 const showImageDialog = ref(false)
 const showUpdateImageDialog = ref(false)
+const invoiceDetailDialog = ref(false)
 const previewImageUrl = ref('')
+const currentInvoice = ref(null)
 
 const uploading = ref(false)
 const updating = ref(false)
@@ -372,6 +559,102 @@ const uploadForm = reactive({
 const updateForm = reactive({
   invoiceId: '',
   file: null
+})
+
+const toggleRawContent = () => {
+  showRawContent.value = !showRawContent.value
+}
+
+const parsedRAGResult = computed(() => {
+  if (!auditResult.value?.rag_results) return null
+  
+  let ragData = auditResult.value.rag_results
+  if (typeof ragData === 'string') {
+    try {
+      ragData = JSON.parse(ragData)
+    } catch {
+      return { rawContent: ragData }
+    }
+  }
+
+  const content = ragData.content || ''
+  const result = {
+    conclusion: ragData.conclusion || '通过',
+    confidence: ragData.confidence || 0,
+    reasoning: ragData.reasoning || '',
+    reasons: [],
+    suggestions: ragData.suggestions || [],
+    rawContent: content
+  }
+
+  if (!ragData.conclusion) {
+    if (content.includes('驳回') || content.includes('不通过')) {
+      result.conclusion = '驳回'
+    }
+
+    const conclusionMatch = content.match(/\*\*审核结论[：:]\*\*\s*([^\n]+)/i)
+    if (conclusionMatch) {
+      result.conclusion = conclusionMatch[1].trim()
+    }
+  }
+
+  const reasonSection = content.match(/\*\*审核理由[：:]\*\*([\s\S]*?)(?=\*\*|$)/i)
+  if (reasonSection) {
+    const reasonText = reasonSection[1]
+    const reasonItems = reasonText.split(/\d+\.\s+/).filter(item => item.trim())
+    reasonItems.forEach(item => {
+      const lines = item.trim().split('\n')
+      const titleMatch = lines[0].match(/\*\*([^*]+)\*\*[：:]?\s*(.*)/)
+      if (titleMatch) {
+        result.reasons.push({
+          title: titleMatch[1].trim(),
+          text: (titleMatch[2] + lines.slice(1).join(' ')).trim()
+        })
+      } else if (lines[0].trim()) {
+        result.reasons.push({ text: lines[0].trim() })
+      }
+    })
+  }
+
+  const suggestionSection = content.match(/\*\*处理建议[：:]\*\*([\s\S]*?)(?=\*\*|$)/i) ||
+                            content.match(/\*\*后续操作建议[：:]\*\*([\s\S]*?)(?=\*\*|$)/i)
+  if (suggestionSection) {
+    const suggestionText = suggestionSection[1]
+    const suggestionItems = suggestionText.split(/\d+\.\s+/).filter(item => item.trim())
+    suggestionItems.forEach(item => {
+      const cleanItem = item.replace(/\*\*/g, '').trim()
+      if (cleanItem) {
+        result.suggestions.push(cleanItem)
+      }
+    })
+  }
+
+  if (result.reasons.length === 0) {
+    const numberedItems = content.match(/\d+\.\s+\*\*[^*]+\*\*[：:][\s\S]*?(?=\d+\.\s+\*\*|$)/g)
+    if (numberedItems) {
+      numberedItems.forEach(item => {
+        const titleMatch = item.match(/\d+\.\s+\*\*([^*]+)\*\*[：:]/)
+        const textMatch = item.replace(/\d+\.\s+\*\*[^*]+\*\*[：:]/, '').trim()
+        if (titleMatch) {
+          result.reasons.push({
+            title: titleMatch[1].trim(),
+            text: textMatch.replace(/\n/g, ' ').trim()
+          })
+        }
+      })
+    }
+  }
+
+  if (result.suggestions.length === 0) {
+    const suggestionItems = content.match(/建议[：:][^\n]*/g)
+    if (suggestionItems) {
+      suggestionItems.forEach(item => {
+        result.suggestions.push(item.replace(/建议[：:]/, '').trim())
+      })
+    }
+  }
+
+  return result
 })
 
 const getStatusText = (status) => {
@@ -454,6 +737,10 @@ const loadAuditStatus = async (auditId) => {
   try {
     const response = await getAuditStatus(auditId)
     auditStatus.value = response.data
+    console.log('审核状态:', auditStatus.value)
+    console.log('workflow_status:', auditStatus.value?.workflow_status)
+    console.log('isAdmin:', isAdmin.value)
+    console.log('reimbursement.status:', reimbursement.value.status)
   } catch (error) {
     console.error('加载审核状态失败:', error)
   }
@@ -493,16 +780,24 @@ const getTimelineStatus = (step) => {
   }
   
   if (step === 1) {
-    if (status === '规则审核通过') return 'success'
-    if (status === '规则审核失败') return 'error'
-    if (status === '规则审核中') return 'process'
+    const rulePassedStates = ['规则审核通过', 'AI审核中', '审核结论：通过', '审核结论：驳回', '待人工审核', '人工审核通过', '人工审核驳回', '已通过', '已驳回']
+    const ruleFailedStates = ['规则审核失败']
+    const ruleRunningStates = ['规则审核中']
+    
+    if (rulePassedStates.includes(status)) return 'success'
+    if (ruleFailedStates.includes(status)) return 'error'
+    if (ruleRunningStates.includes(status)) return 'process'
     return 'wait'
   }
   
   if (step === 2) {
-    if (status === 'AI审核通过') return 'success'
-    if (status === 'AI审核失败') return 'error'
-    if (status === 'AI审核中') return 'process'
+    const ragPassedStates = ['审核结论：通过', '待人工审核', '人工审核通过', '人工审核驳回', '已通过']
+    const ragFailedStates = ['审核结论：驳回', '已驳回']
+    const ragRunningStates = ['AI审核中']
+    
+    if (ragPassedStates.includes(status)) return 'success'
+    if (ragFailedStates.includes(status)) return 'error'
+    if (ragRunningStates.includes(status)) return 'process'
     return 'wait'
   }
   
@@ -529,7 +824,7 @@ const getTimelineTime = (step) => {
       logMap['start'] = log.created_at
     } else if (log.flow_status === '规则审核通过' || log.flow_status === '规则审核失败') {
       logMap['rule'] = log.created_at
-    } else if (log.flow_status === 'AI审核通过' || log.flow_status === 'AI审核失败') {
+    } else if (log.flow_status === '审核结论：通过' || log.flow_status === '审核结论：驳回') {
       logMap['rag'] = log.created_at
     } else if (log.flow_status === '人工审核通过' || log.flow_status === '人工审核驳回') {
       logMap['manual'] = log.created_at
@@ -628,8 +923,9 @@ const getImageUrl = (imagePath) => {
   return `http://127.0.0.1:8080/api/v1/files/${imagePath}`
 }
 
-const toggleInvoiceDetail = (invoiceId) => {
-  expandedInvoices.value[invoiceId] = !expandedInvoices.value[invoiceId]
+const openInvoiceDetailDialog = (invoice) => {
+  currentInvoice.value = invoice
+  invoiceDetailDialog.value = true
 }
 
 const handleUpdateInvoiceImage = async (invoiceId) => {
@@ -666,8 +962,8 @@ const handleUpdateImage = async () => {
 const startAudit = async () => {
   try {
     await startAuditApi({ reimbursement_id: reimbursement.value.id })
-    ElMessage.success('已提交审核，正在自动进行规则审核和AI审核')
-    setTimeout(() => loadReimbursement(), 2000)
+    ElMessage.success('审核完成')
+    await loadReimbursement()
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '提交审核失败')
   }
@@ -684,6 +980,47 @@ const handleWithdrawAudit = async () => {
     setTimeout(() => loadReimbursement(), 1000)
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '撤回失败')
+  }
+}
+
+const handleManualApprove = async () => {
+  if (!auditResult.value?.id) {
+    ElMessage.error('审核信息不存在')
+    return
+  }
+  
+  try {
+    manualAuditLoading.value = true
+    await manualAudit(auditResult.value.id, 'pass', '')
+    ElMessage.success('审核通过')
+    setTimeout(() => loadReimbursement(), 1000)
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '审核失败')
+  } finally {
+    manualAuditLoading.value = false
+  }
+}
+
+const handleManualReject = () => {
+  if (!auditResult.value?.id) {
+    ElMessage.error('审核信息不存在')
+    return
+  }
+  rejectReason.value = ''
+  showRejectDialog.value = true
+}
+
+const confirmReject = async () => {
+  try {
+    manualAuditLoading.value = true
+    await manualAudit(auditResult.value.id, 'reject', rejectReason.value)
+    ElMessage.success('审核驳回')
+    showRejectDialog.value = false
+    setTimeout(() => loadReimbursement(), 1000)
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '审核失败')
+  } finally {
+    manualAuditLoading.value = false
   }
 }
 
@@ -897,6 +1234,188 @@ onMounted(() => {
   margin-top: 20px;
 }
 
+.rag-results {
+  margin-top: 20px;
+}
+
+.rag-dialog-content {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.rag-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.rag-conclusion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+}
+
+.rag-conclusion.pass {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.rag-conclusion.reject {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.rag-confidence {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rag-confidence .label {
+  font-size: 14px;
+  color: #606266;
+}
+
+.rag-section {
+  margin-top: 20px;
+}
+
+.rag-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.rag-section-title.collapsible {
+  cursor: pointer;
+  user-select: none;
+}
+
+.rag-section-title.collapsible:hover {
+  color: #409eff;
+}
+
+.toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s;
+}
+
+.toggle-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.rag-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rag-reasoning {
+  background: #fafafa;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 3px solid #e6a23c;
+  line-height: 1.8;
+  color: #303133;
+}
+
+.rag-reasoning p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.reason-item {
+  display: flex;
+  gap: 12px;
+  background: #fafafa;
+  padding: 12px 15px;
+  border-radius: 8px;
+  border-left: 3px solid #e6a23c;
+}
+
+.reason-number {
+  width: 24px;
+  height: 24px;
+  background: #e6a23c;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.reason-content {
+  flex: 1;
+}
+
+.reason-title {
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 4px;
+}
+
+.reason-text {
+  color: #606266;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.rag-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 15px;
+  background: #f0f9eb;
+  border-radius: 8px;
+  color: #67c23a;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.suggestion-item .el-icon {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.rag-raw-content {
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 15px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.rag-raw-content pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #606266;
+}
+
 .rule-result-item {
   background: #f8f9fa;
   border-radius: 8px;
@@ -971,5 +1490,66 @@ onMounted(() => {
 .actions {
   display: flex;
   flex-direction: column;
+}
+
+.manual-audit-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
+}
+
+.manual-audit-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.manual-audit-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.manual-audit-buttons .el-button {
+  flex: 1;
+  max-width: 120px;
+}
+
+.invoice-detail-content {
+  padding: 10px 0;
+}
+
+.invoice-image-preview {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.invoice-image-preview :deep(.el-image) {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.image-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 300px;
+  background: #f5f7fa;
+  color: #909399;
+  border-radius: 8px;
+}
+
+.image-error .el-icon {
+  font-size: 48px;
+}
+
+.amount-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e74c3c;
 }
 </style>

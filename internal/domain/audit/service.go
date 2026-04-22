@@ -2,8 +2,10 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"reimbursement-audit/internal/domain/rag"
@@ -20,7 +22,13 @@ type Service struct {
 	reimbursementRepo reimbursement.Repository
 	ruleEngineService *ruleenginedomain.RuleEngineService
 	ragService        *rag.RAGService
+	ocrService        OCRService
 	logger            logger.Logger
+}
+
+// OCRService OCR服务接口
+type OCRService interface {
+	ParseInvoiceImage(ctx context.Context, invoiceID string) error
 }
 
 // NewService 创建审核服务
@@ -29,6 +37,7 @@ func NewService(
 	reimbursementRepo reimbursement.Repository,
 	ruleEngineService *ruleenginedomain.RuleEngineService,
 	ragService *rag.RAGService,
+	ocrService OCRService,
 	logger logger.Logger,
 ) *Service {
 	return &Service{
@@ -36,6 +45,7 @@ func NewService(
 		reimbursementRepo: reimbursementRepo,
 		ruleEngineService: ruleEngineService,
 		ragService:        ragService,
+		ocrService:        ocrService,
 		logger:            logger,
 	}
 }
@@ -93,6 +103,29 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 	audit.UpdatedAt = startTime
 	s.repo.UpdateAudit(ctx, audit)
 
+	if s.ocrService != nil && len(reimbursement.Invoices) > 0 {
+		s.logger.WithContext(ctx).Info("检查发票OCR状态", logger.NewField("invoice_count", len(reimbursement.Invoices)))
+
+		for _, invoice := range reimbursement.Invoices {
+			if invoice.Status == "待识别" || invoice.CommodityName == "" {
+				s.logger.WithContext(ctx).Info("发票未完成OCR识别，开始执行OCR",
+					logger.NewField("invoice_id", invoice.ID),
+					logger.NewField("current_status", invoice.Status))
+
+				if err := s.ocrService.ParseInvoiceImage(ctx, invoice.ID); err != nil {
+					s.logger.WithContext(ctx).Error("OCR识别失败",
+						logger.NewField("invoice_id", invoice.ID),
+						logger.NewField("error", err))
+				}
+			}
+		}
+
+		reimbursement.Invoices, err = s.reimbursementRepo.GetInvoicesByReimbursementID(ctx, reimbursementID)
+		if err != nil {
+			s.logger.WithContext(ctx).Error("重新获取发票信息失败", logger.NewField("error", err))
+		}
+	}
+
 	ruleResults, err := s.executeRuleValidation(ctx, reimbursement)
 	if err != nil {
 		s.logger.WithContext(ctx).Error("规则校验失败", logger.NewField("error", err))
@@ -131,17 +164,38 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 
 	if !rulePass {
 		audit.WorkflowStatus = WorkflowStatusRuleFailed
-		audit.Status = AuditStatusCompleted
-		audit.Reason = "规则校验未通过"
+		audit.UpdatedAt = time.Now()
+		s.repo.UpdateAudit(ctx, audit)
+
+		reimbursementInfo := s.buildReimbursementInfo(reimbursement)
+
+		audit.WorkflowStatus = WorkflowStatusRAGAudit
+		audit.UpdatedAt = time.Now()
+		s.repo.UpdateAudit(ctx, audit)
+
+		ragResult, err := s.executeRAGAnalysis(ctx, reimbursementInfo)
+		if err != nil {
+			s.logger.WithContext(ctx).Error("RAG分析失败", logger.NewField("error", err))
+			audit.RAGPass = false
+		} else {
+			audit.RAGResults = ragResult
+			audit.RAGPass = ragResult != nil && ragResult.Confidence > 0.6
+		}
+
 		audit.FinalPass = false
-		audit.RAGPass = false
-		audit.RiskScore = 1.0
-		audit.RiskLevel = "高风险"
+		audit.Reason = "规则校验未通过"
+		audit.RiskScore = s.calculateRiskScore(audit)
+		audit.RiskLevel = s.determineRiskLevel(audit.RiskScore)
+		audit.Suggestions = s.generateSuggestions(audit)
 		completedTime := time.Now()
 		audit.CompletedAt = &completedTime
 		audit.Duration = completedTime.Sub(startTime).Milliseconds()
 		audit.UpdatedAt = completedTime
-		s.repo.UpdateAudit(ctx, audit)
+
+		if err := s.repo.UpdateAudit(ctx, audit); err != nil {
+			s.logger.WithContext(ctx).Error("更新审核记录失败", logger.NewField("error", err))
+			return nil, fmt.Errorf("更新审核记录失败: %w", err)
+		}
 
 		reimbursement.Status = "rejected"
 		if err := s.reimbursementRepo.UpdateReimbursement(ctx, reimbursement); err != nil {
@@ -158,7 +212,9 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 			Reason:          &audit.Reason,
 			CreatedAt:       completedTime,
 		}
-		s.repo.CreateFlowLog(ctx, failFlowLog)
+		if err := s.repo.CreateFlowLog(ctx, failFlowLog); err != nil {
+			s.logger.WithContext(ctx).Error("创建流程日志失败", logger.NewField("error", err))
+		}
 
 		return audit, nil
 	}
@@ -205,7 +261,17 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 	}
 
 	audit.RAGResults = ragResult
-	audit.RAGPass = ragResult != nil && ragResult.Confidence > 0.6
+	ragConfidence := 0.0
+	aiConclusionIsReject := false
+
+	if ragResult != nil {
+		ragConfidence = ragResult.Confidence
+		if ragResult.Conclusion == "驳回" || ragResult.Conclusion == "不通过" || ragResult.Conclusion == "拒绝" {
+			aiConclusionIsReject = true
+		}
+	}
+
+	audit.RAGPass = !aiConclusionIsReject || ragConfidence <= 0.6
 
 	audit.FinalPass = audit.RulePass && audit.RAGPass
 	audit.RiskScore = s.calculateRiskScore(audit)
@@ -219,9 +285,9 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 	audit.UpdatedAt = completedTime
 
 	if audit.FinalPass {
-		audit.WorkflowStatus = WorkflowStatusRAGPassed
+		audit.WorkflowStatus = WorkflowStatusManualAudit
 		audit.Status = AuditStatusManual
-		audit.Reason = "智能审核通过，等待人工审核"
+		audit.Reason = "审核结论：通过，等待人工审核"
 
 		reimbursement.Status = "auditing"
 		if err := s.reimbursementRepo.UpdateReimbursement(ctx, reimbursement); err != nil {
@@ -254,27 +320,65 @@ func (s *Service) StartAudit(ctx context.Context, reimbursementID string) (*Audi
 			s.logger.WithContext(ctx).Error("创建流程日志失败", logger.NewField("error", err))
 		}
 	} else {
-		audit.WorkflowStatus = WorkflowStatusRAGFailed
-		audit.Status = AuditStatusCompleted
-		audit.Reason = "智能审核未通过"
+		if ragConfidence > 0.6 {
+			audit.WorkflowStatus = WorkflowStatusRAGFailed
+			audit.Status = AuditStatusCompleted
+			audit.Reason = "审核结论：驳回（AI高置信度驳回，无需人工审核）"
 
-		reimbursement.Status = "rejected"
-		if err := s.reimbursementRepo.UpdateReimbursement(ctx, reimbursement); err != nil {
-			s.logger.WithContext(ctx).Error("更新报销单状态失败", logger.NewField("error", err))
-		}
+			reimbursement.Status = "rejected"
+			if err := s.reimbursementRepo.UpdateReimbursement(ctx, reimbursement); err != nil {
+				s.logger.WithContext(ctx).Error("更新报销单状态失败", logger.NewField("error", err))
+			}
 
-		failFlowLog := &AuditFlowLog{
-			ID:              uuid.New().String(),
-			ReimbursementID: reimbursementID,
-			AuditID:         audit.ID,
-			FlowStatus:      FlowStatusIntelligentFail,
-			FlowType:        FlowTypeIntelligent,
-			Action:          FlowActionRejectAudit,
-			Reason:          &audit.Reason,
-			CreatedAt:       completedTime,
-		}
-		if err := s.repo.CreateFlowLog(ctx, failFlowLog); err != nil {
-			s.logger.WithContext(ctx).Error("创建流程日志失败", logger.NewField("error", err))
+			failFlowLog := &AuditFlowLog{
+				ID:              uuid.New().String(),
+				ReimbursementID: reimbursementID,
+				AuditID:         audit.ID,
+				FlowStatus:      FlowStatusIntelligentFail,
+				FlowType:        FlowTypeIntelligent,
+				Action:          FlowActionRejectAudit,
+				Reason:          &audit.Reason,
+				CreatedAt:       completedTime,
+			}
+			if err := s.repo.CreateFlowLog(ctx, failFlowLog); err != nil {
+				s.logger.WithContext(ctx).Error("创建流程日志失败", logger.NewField("error", err))
+			}
+		} else {
+			audit.WorkflowStatus = WorkflowStatusManualAudit
+			audit.Status = AuditStatusManual
+			audit.Reason = "审核结论：驳回，等待人工审核"
+
+			reimbursement.Status = "auditing"
+			if err := s.reimbursementRepo.UpdateReimbursement(ctx, reimbursement); err != nil {
+				s.logger.WithContext(ctx).Error("更新报销单状态失败", logger.NewField("error", err))
+			}
+
+			failFlowLog := &AuditFlowLog{
+				ID:              uuid.New().String(),
+				ReimbursementID: reimbursementID,
+				AuditID:         audit.ID,
+				FlowStatus:      FlowStatusIntelligentFail,
+				FlowType:        FlowTypeIntelligent,
+				Action:          FlowActionRejectAudit,
+				Reason:          &audit.Reason,
+				CreatedAt:       completedTime,
+			}
+			if err := s.repo.CreateFlowLog(ctx, failFlowLog); err != nil {
+				s.logger.WithContext(ctx).Error("创建流程日志失败", logger.NewField("error", err))
+			}
+
+			manualFlowLog := &AuditFlowLog{
+				ID:              uuid.New().String(),
+				ReimbursementID: reimbursementID,
+				AuditID:         audit.ID,
+				FlowStatus:      FlowStatusManualStart,
+				FlowType:        FlowTypeManual,
+				Action:          FlowActionStartAudit,
+				CreatedAt:       completedTime,
+			}
+			if err := s.repo.CreateFlowLog(ctx, manualFlowLog); err != nil {
+				s.logger.WithContext(ctx).Error("创建流程日志失败", logger.NewField("error", err))
+			}
 		}
 	}
 
@@ -321,17 +425,18 @@ func (s *Service) executeRuleValidation(ctx context.Context, reimbursement *reim
 
 	allResults := make([]*RuleValidationResult, 0)
 
+	reimbursementMap := s.toMap(reimbursement)
+
 	for _, invoice := range reimbursement.Invoices {
 		s.logger.WithContext(ctx).Debug("开始校验发票",
 			logger.NewField("发票ID", invoice.ID),
 			logger.NewField("发票号码", invoice.Number))
 
+		invoiceMap := s.toMap(invoice)
+
 		validationData := map[string]interface{}{
-			"invoice":                             invoice,
-			"reimbursement":                       reimbursement,
-			"apply_date":                          reimbursement.ApplyDate,
-			"is_invoice_date_older_than_6_months": invoice.Date != nil && invoice.Date.Before(reimbursement.ApplyDate.AddDate(0, -6, 0)),
-			"price":                               invoice.Price,
+			"invoice":       invoiceMap,
+			"reimbursement": reimbursementMap,
 		}
 
 		results, err := s.ruleEngineService.ExecuteAllRules(ctx, validationData)
@@ -343,22 +448,38 @@ func (s *Service) executeRuleValidation(ctx context.Context, reimbursement *reim
 		}
 
 		for _, result := range results {
-			allResults = append(allResults, &RuleValidationResult{
-				RuleID:        result.RuleID,
-				RuleCode:      result.RuleID,
-				RuleName:      result.RuleName,
-				RuleType:      result.RuleType,
-				Passed:        result.Passed,
-				Message:       result.Message,
-				Details:       map[string]interface{}{"details": result.Details, "invoice_id": invoice.ID},
-				ExecutionTime: result.ExecutionTime,
-			})
+			if result.Passed && strings.Contains(result.Message, "命中") {
+				allResults = append(allResults, &RuleValidationResult{
+					RuleID:        result.RuleID,
+					RuleCode:      result.RuleID,
+					RuleName:      result.RuleName,
+					RuleType:      result.RuleType,
+					Passed:        false,
+					Message:       result.Message,
+					Details:       map[string]interface{}{"details": result.Details, "invoice_id": invoice.ID},
+					ExecutionTime: result.ExecutionTime,
+				})
+			}
 		}
 	}
 
 	s.logger.WithContext(ctx).Info("规则校验完成", logger.NewField("result_count", len(allResults)))
 
 	return allResults, nil
+}
+
+func (s *Service) toMap(obj interface{}) map[string]interface{} {
+	jsonBytes, err := json.Marshal(obj)
+	if err != nil {
+		s.logger.Error("对象序列化失败", logger.NewField("error", err))
+		return make(map[string]interface{})
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal(jsonBytes, &result); err != nil {
+		s.logger.Error("对象反序列化失败", logger.NewField("error", err))
+		return make(map[string]interface{})
+	}
+	return result
 }
 
 // executeRAGAnalysis 执行RAG分析
@@ -373,11 +494,14 @@ func (s *Service) executeRAGAnalysis(ctx context.Context, reimbursementInfo map[
 
 	ragResult := &RAGAnalysisResult{
 		Query:         result.Query,
-		Content:       result.AnalysisResult.Conclusion,
+		Content:       result.Response.Content,
+		Conclusion:    result.AnalysisResult.Conclusion,
+		Reasoning:     result.AnalysisResult.Reasoning,
 		Confidence:    result.AnalysisResult.Confidence,
 		Analysis:      result.AnalysisResult.Reasoning,
 		ExecutionTime: result.ExecutionTime,
 		Chunks:        result.Chunks,
+		Suggestions:   result.AnalysisResult.Suggestions,
 	}
 
 	for _, doc := range result.Documents {
@@ -660,12 +784,12 @@ func (s *Service) ManualAudit(ctx context.Context, auditID string, action string
 		return nil, fmt.Errorf("获取审核记录失败: %w", err)
 	}
 
-	if audit.Status != AuditStatusCompleted {
-		return nil, errors.New("只能审核已完成的智能审核")
+	if audit.Status != AuditStatusManual {
+		return nil, errors.New("只能审核待人工审核的报销单")
 	}
 
-	if !audit.FinalPass {
-		return nil, errors.New("智能审核未通过，无法进行人工审核")
+	if audit.WorkflowStatus != WorkflowStatusManualAudit {
+		return nil, errors.New("当前状态不允许人工审核")
 	}
 
 	reimbursement, err := s.reimbursementRepo.GetReimbursementByID(ctx, audit.ReimbursementID)

@@ -36,6 +36,7 @@ type CreateReimbursementRequest struct {
 	UserName    string  `json:"user_name"`
 	Department  string  `json:"department"`
 	Category    string  `json:"category"`
+	Title       string  `json:"title"`
 	Reason      string  `json:"reason"`
 	Description string  `json:"description"`
 	TotalAmount float64 `json:"total_amount"`
@@ -85,7 +86,7 @@ func (s *DomainService) CreateReimbursement(ctx context.Context, req *CreateReim
 		UserName:    req.UserName,
 		Department:  req.Department,
 		Type:        req.Category, // 使用Category作为Type
-		Title:       req.Reason,   // 使用Reason作为Title
+		Title:       req.Title,
 		Description: req.Description,
 		TotalAmount: req.TotalAmount,
 		Currency:    "CNY", // 默认使用人民币

@@ -195,6 +195,9 @@ func (h *KnowledgeHandler) UpdateFile(c *gin.Context) {
 	if req.Description != "" {
 		file.Description = req.Description
 	}
+	if req.Status != "" {
+		file.Status = req.Status
+	}
 
 	if err := h.knowledgeService.UpdateFile(file); err != nil {
 		middleware.LogError(c, "更新文件失败", "error", err.Error(), "context", ctx)

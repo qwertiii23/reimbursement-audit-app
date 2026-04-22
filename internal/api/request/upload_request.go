@@ -24,6 +24,7 @@ type ReimbursementUploadRequest struct {
 	UserName    string  `json:"user_name" form:"user_name"`       // 用户姓名，必填
 	TotalAmount float64 `json:"total_amount" form:"total_amount"` // 总金额，必填，大于0
 	Category    string  `json:"category" form:"category"`         // 报销类别，必填
+	Title       string  `json:"title" form:"title"`               // 报销标题，必填
 	Reason      string  `json:"reason" form:"reason"`             // 报销事由，必填
 	Department  string  `json:"department" form:"department"`     // 所属部门，可选
 	ApplyDate   string  `json:"apply_date" form:"apply_date"`     // 申请日期，可选，格式：YYYY-MM-DD

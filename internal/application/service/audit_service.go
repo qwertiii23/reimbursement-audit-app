@@ -106,10 +106,10 @@ func (s *AuditApplicationService) RetryAudit(ctx context.Context, auditID string
 }
 
 // ManualAudit 人工审核用例
-func (s *AuditApplicationService) ManualAudit(ctx context.Context, req *request.ManualAuditRequest, userID string, userName string, ipAddress string) (*response.AuditResponse, error) {
-	s.logger.WithContext(ctx).Info("人工审核", logger.NewField("audit_id", req.AuditID))
+func (s *AuditApplicationService) ManualAudit(ctx context.Context, auditID string, req *request.ManualAuditRequest, userID string, userName string, ipAddress string) (*response.AuditResponse, error) {
+	s.logger.WithContext(ctx).Info("人工审核", logger.NewField("audit_id", auditID))
 
-	auditResult, err := s.auditService.ManualAudit(ctx, req.AuditID, req.Action, req.Reason, userID, userName, ipAddress)
+	auditResult, err := s.auditService.ManualAudit(ctx, auditID, req.Action, req.Reason, userID, userName, ipAddress)
 	if err != nil {
 		s.logger.WithContext(ctx).Error("人工审核失败", logger.NewField("error", err))
 		return nil, fmt.Errorf("人工审核失败: %w", err)

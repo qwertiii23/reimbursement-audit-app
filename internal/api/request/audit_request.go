@@ -75,16 +75,12 @@ func (r *AuditHistoryRequest) Validate() error {
 
 // ManualAuditRequest 人工审核请求
 type ManualAuditRequest struct {
-	AuditID string `json:"audit_id" binding:"required"`
-	Action  string `json:"action" binding:"required,oneof=pass reject"`
-	Reason  string `json:"reason"`
+	Action string `json:"action" binding:"required,oneof=pass reject"`
+	Reason string `json:"reason"`
 }
 
 // Validate 校验人工审核请求
 func (r *ManualAuditRequest) Validate() error {
-	if r.AuditID == "" {
-		return nil
-	}
 	if r.Action != "pass" && r.Action != "reject" {
 		return nil
 	}

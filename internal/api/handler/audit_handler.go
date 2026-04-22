@@ -169,6 +169,13 @@ func (h *AuditHandler) ManualAudit(c *gin.Context) {
 	traceId := middleware.GetTraceId(c)
 	ctx := middleware.WithTraceId(context.Background(), traceId)
 
+	auditID := c.Param("id")
+	if auditID == "" {
+		middleware.LogError(c, "缺少审核ID", "context", ctx)
+		response.ErrorResponse(c, response.CodeInvalidParams, "缺少审核ID")
+		return
+	}
+
 	var req request.ManualAuditRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.LogError(c, "JSON数据绑定失败", "error", err.Error(), "context", ctx)
@@ -192,14 +199,14 @@ func (h *AuditHandler) ManualAudit(c *gin.Context) {
 
 	ipAddress := c.ClientIP()
 
-	auditResponse, err := h.auditService.ManualAudit(ctx, &req, userID, userName, ipAddress)
+	auditResponse, err := h.auditService.ManualAudit(ctx, auditID, &req, userID, userName, ipAddress)
 	if err != nil {
 		middleware.LogError(c, "人工审核失败", "error", err.Error(), "context", ctx)
 		response.ErrorResponse(c, response.CodeInternalError, err.Error())
 		return
 	}
 
-	middleware.LogInfo(c, "人工审核成功", "audit_id", req.AuditID, "context", ctx)
+	middleware.LogInfo(c, "人工审核成功", "audit_id", auditID, "context", ctx)
 	response.SuccessResponse(c, auditResponse)
 }
 

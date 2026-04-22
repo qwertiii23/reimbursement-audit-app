@@ -95,7 +95,16 @@ func (h *QueryHandler) GetReimbursementsByUserID(c *gin.Context) {
 		logger.NewField("start_date", startDate),
 		logger.NewField("end_date", endDate))
 
-	reimbursements, total, err := h.reimbursementRepo.ListReimbursementsByUserIDWithFilters(c.Request.Context(), userID, page, size, title, status, startDate, endDate)
+	var reimbursements []*reimbursement.Reimbursement
+	var total int64
+	var err error
+
+	if userID == "all" {
+		reimbursements, total, err = h.reimbursementRepo.ListAllReimbursementsWithFilters(c.Request.Context(), page, size, title, status, startDate, endDate)
+	} else {
+		reimbursements, total, err = h.reimbursementRepo.ListReimbursementsByUserIDWithFilters(c.Request.Context(), userID, page, size, title, status, startDate, endDate)
+	}
+
 	if err != nil {
 		h.logger.WithContext(c.Request.Context()).Error("查询报销单列表失败",
 			logger.NewField("error", err.Error()),
