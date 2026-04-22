@@ -1,0 +1,1 @@
+INSERT INTO users (id, username, password, email, real_name, role, status, created_at, updated_at, last_login) VALUES ('550e8400-e29b-41d4-a716-446655440004', 'finance', '$2a$10$TI1ZP.F95phpzdgXLJtPjOtIp0aHpw9cl2SVPmJcWqW0mSnmm5cmG', 'finance@example.com', '财务人员', 'finance', 'active', NOW(), NOW(), NULL);

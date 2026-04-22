@@ -28,8 +28,8 @@ const (
 	WorkflowStatusRulePassed     WorkflowStatus = "规则审核通过"
 	WorkflowStatusRuleFailed     WorkflowStatus = "规则审核失败"
 	WorkflowStatusRAGAudit       WorkflowStatus = "AI审核中"
-	WorkflowStatusRAGPassed      WorkflowStatus = "AI审核通过"
-	WorkflowStatusRAGFailed      WorkflowStatus = "AI审核失败"
+	WorkflowStatusRAGPassed      WorkflowStatus = "审核结论：通过"
+	WorkflowStatusRAGFailed      WorkflowStatus = "审核结论：驳回"
 	WorkflowStatusManualAudit    WorkflowStatus = "待人工审核"
 	WorkflowStatusManualPassed   WorkflowStatus = "人工审核通过"
 	WorkflowStatusManualRejected WorkflowStatus = "人工审核驳回"
@@ -76,11 +76,14 @@ type RuleValidationResult struct {
 type RAGAnalysisResult struct {
 	Query         string               `json:"query"`
 	Content       string               `json:"content"`
+	Conclusion    string               `json:"conclusion"`
+	Reasoning     string               `json:"reasoning"`
 	Confidence    float64              `json:"confidence"`
 	References    []*VectorReference   `json:"references"`
 	Analysis      string               `json:"analysis"`
 	ExecutionTime int64                `json:"execution_time"`
 	Chunks        []*rag.DocumentChunk `json:"chunks"`
+	Suggestions   []string             `json:"suggestions"`
 }
 
 // VectorReference 向量检索引用

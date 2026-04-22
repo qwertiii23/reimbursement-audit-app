@@ -24,9 +24,6 @@
           <el-button type="primary" :icon="Search" @click="handleSearch">
             搜索
           </el-button>
-          <el-button :icon="Refresh" @click="handleReset" style="margin-left: 10px;">
-            重置
-          </el-button>
           <el-button v-if="isAdmin" type="success" :icon="Upload" @click="handleUpload" style="margin-left: 10px;">
             上传文件
           </el-button>
@@ -65,7 +62,7 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="handleView(row)">
               查看
@@ -75,6 +72,15 @@
             </el-button>
             <el-button v-if="isAdmin" type="primary" link size="small" @click="handleEdit(row)">
               编辑
+            </el-button>
+            <el-button 
+              v-if="isAdmin" 
+              :type="row.status === 'active' ? 'warning' : 'success'" 
+              link 
+              size="small" 
+              @click="handleToggleStatus(row)"
+            >
+              {{ row.status === 'active' ? '禁用' : '启用' }}
             </el-button>
             <el-button v-if="isAdmin" type="danger" link size="small" @click="handleDelete(row)">
               删除
@@ -231,13 +237,12 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Upload, UploadFilled } from '@element-plus/icons-vue'
+import { Search, Upload, UploadFilled } from '@element-plus/icons-vue'
 import { getKnowledgeFiles, uploadKnowledgeFile, updateKnowledgeFile, deleteKnowledgeFile, downloadKnowledgeFile, viewKnowledgeFile } from '@/api/knowledge'
+import { useUserStore } from '@/stores/user'
 
-const isAdmin = computed(() => {
-  const userRole = localStorage.getItem('userRole')
-  return userRole === 'admin'
-})
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.isAdmin)
 
 const loading = ref(false)
 const fileList = ref([])
@@ -318,14 +323,6 @@ const fetchFiles = async () => {
 }
 
 const handleSearch = () => {
-  pagination.page = 1
-  fetchFiles()
-}
-
-const handleReset = () => {
-  filterForm.fileName = ''
-  filterForm.category = ''
-  filterForm.status = ''
   pagination.page = 1
   fetchFiles()
 }
@@ -467,6 +464,29 @@ const handleViewDialogClose = () => {
 
 const handleDownloadFromView = () => {
   handleDownload(viewForm)
+}
+
+const handleToggleStatus = async (row) => {
+  const newStatus = row.status === 'active' ? 'inactive' : 'active'
+  const actionText = newStatus === 'active' ? '启用' : '禁用'
+  
+  ElMessageBox.confirm(`确定要${actionText}文件"${row.file_name}"吗？`, '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      const res = await updateKnowledgeFile(row.id, { status: newStatus })
+      if (res.code === 200) {
+        ElMessage.success(`${actionText}成功`)
+        fetchFiles()
+      } else {
+        ElMessage.error(res.message || `${actionText}失败`)
+      }
+    } catch (error) {
+      ElMessage.error(`${actionText}失败`)
+    }
+  }).catch(() => {})
 }
 
 const handleDelete = (row) => {

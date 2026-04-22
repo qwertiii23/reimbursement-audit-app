@@ -513,3 +513,747 @@ func (f *InvoiceFraudDetectionFunction) getImageURL(imagePath string) string {
 	}
 	return "http://localhost:8080" + imagePath
 }
+
+func parseDate(d interface{}) (time.Time, error) {
+	switch v := d.(type) {
+	case time.Time:
+		return v, nil
+	case *time.Time:
+		if v != nil {
+			return *v, nil
+		}
+		return time.Time{}, fmt.Errorf("date is nil")
+	case string:
+		formats := []string{
+			time.RFC3339,
+			"2006-01-02T15:04:05Z07:00",
+			"2006-01-02",
+			"2006-01-02 15:04:05",
+		}
+		for _, format := range formats {
+			if parsed, err := time.Parse(format, v); err == nil {
+				return parsed, nil
+			}
+		}
+		return time.Time{}, fmt.Errorf("date parse failed: %s", v)
+	default:
+		return time.Time{}, fmt.Errorf("date type not supported: %T", d)
+	}
+}
+
+type ReimbursementTotalAmountFunction struct{}
+
+func NewReimbursementTotalAmountFunction() *ReimbursementTotalAmountFunction {
+	return &ReimbursementTotalAmountFunction{}
+}
+
+func (f *ReimbursementTotalAmountFunction) GetName() string {
+	return "reimbursement_total_amount"
+}
+
+func (f *ReimbursementTotalAmountFunction) GetDescription() string {
+	return "提取报销单总金额"
+}
+
+func (f *ReimbursementTotalAmountFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *ReimbursementTotalAmountFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *ReimbursementTotalAmountFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	reimbData := input.InvoiceData["reimbursement"]
+	if reimbData == nil {
+		return &FunctionOutput{Error: "reimbursement data not found"}, nil
+	}
+
+	reimbMap, ok := reimbData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "reimbursement data is not a map"}, nil
+	}
+
+	totalAmount := 0.0
+	if ta, ok := reimbMap["total_amount"]; ok {
+		switch v := ta.(type) {
+		case float64:
+			totalAmount = v
+		case int:
+			totalAmount = float64(v)
+		case string:
+			fmt.Sscanf(v, "%f", &totalAmount)
+		}
+	}
+
+	return &FunctionOutput{
+		Value: totalAmount,
+		Metadata: map[string]interface{}{
+			"total_amount": totalAmount,
+		},
+	}, nil
+}
+
+type InvoiceAmountFunction struct{}
+
+func NewInvoiceAmountFunction() *InvoiceAmountFunction {
+	return &InvoiceAmountFunction{}
+}
+
+func (f *InvoiceAmountFunction) GetName() string {
+	return "invoice_amount"
+}
+
+func (f *InvoiceAmountFunction) GetDescription() string {
+	return "提取发票金额"
+}
+
+func (f *InvoiceAmountFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *InvoiceAmountFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *InvoiceAmountFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	invoiceData := input.InvoiceData["invoice"]
+	if invoiceData == nil {
+		return &FunctionOutput{Error: "invoice data not found"}, nil
+	}
+
+	invoiceMap, ok := invoiceData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "invoice data is not a map"}, nil
+	}
+
+	amount := 0.0
+	if a, ok := invoiceMap["amount"]; ok {
+		switch v := a.(type) {
+		case float64:
+			amount = v
+		case int:
+			amount = float64(v)
+		case string:
+			fmt.Sscanf(v, "%f", &amount)
+		}
+	}
+
+	return &FunctionOutput{
+		Value: amount,
+		Metadata: map[string]interface{}{
+			"amount": amount,
+		},
+	}, nil
+}
+
+type InvoiceDaysFromTodayFunction struct{}
+
+func NewInvoiceDaysFromTodayFunction() *InvoiceDaysFromTodayFunction {
+	return &InvoiceDaysFromTodayFunction{}
+}
+
+func (f *InvoiceDaysFromTodayFunction) GetName() string {
+	return "invoice_days_from_today"
+}
+
+func (f *InvoiceDaysFromTodayFunction) GetDescription() string {
+	return "计算发票日期距今天数"
+}
+
+func (f *InvoiceDaysFromTodayFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *InvoiceDaysFromTodayFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *InvoiceDaysFromTodayFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	invoiceData := input.InvoiceData["invoice"]
+	if invoiceData == nil {
+		return &FunctionOutput{Error: "invoice data not found"}, nil
+	}
+
+	invoiceMap, ok := invoiceData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "invoice data is not a map"}, nil
+	}
+
+	d, ok := invoiceMap["date"]
+	if !ok {
+		return &FunctionOutput{Error: "invoice date not found"}, nil
+	}
+
+	invoiceDate, err := parseDate(d)
+	if err != nil {
+		return &FunctionOutput{Error: err.Error()}, nil
+	}
+
+	now := time.Now()
+	days := int(now.Sub(invoiceDate).Hours() / 24)
+
+	return &FunctionOutput{
+		Value: float64(days),
+		Metadata: map[string]interface{}{
+			"invoice_date":    invoiceDate.Format("2006-01-02"),
+			"today":           now.Format("2006-01-02"),
+			"days_from_today": days,
+		},
+	}, nil
+}
+
+type TripDurationFunction struct{}
+
+func NewTripDurationFunction() *TripDurationFunction {
+	return &TripDurationFunction{}
+}
+
+func (f *TripDurationFunction) GetName() string {
+	return "trip_duration"
+}
+
+func (f *TripDurationFunction) GetDescription() string {
+	return "计算出差天数"
+}
+
+func (f *TripDurationFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *TripDurationFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *TripDurationFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	reimbData := input.InvoiceData["reimbursement"]
+	if reimbData == nil {
+		return &FunctionOutput{Error: "reimbursement data not found"}, nil
+	}
+
+	reimbMap, ok := reimbData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "reimbursement data is not a map"}, nil
+	}
+
+	var startDate, endDate time.Time
+
+	if sd, ok := reimbMap["start_date"]; ok && sd != nil {
+		if parsed, err := parseDate(sd); err == nil {
+			startDate = parsed
+		}
+	}
+
+	if ed, ok := reimbMap["end_date"]; ok && ed != nil {
+		if parsed, err := parseDate(ed); err == nil {
+			endDate = parsed
+		}
+	}
+
+	days := 0.0
+	if !startDate.IsZero() && !endDate.IsZero() {
+		days = endDate.Sub(startDate).Hours()/24 + 1
+		if days < 0 {
+			days = 0
+		}
+	}
+
+	return &FunctionOutput{
+		Value: days,
+		Metadata: map[string]interface{}{
+			"start_date":    startDate.Format("2006-01-02"),
+			"end_date":      endDate.Format("2006-01-02"),
+			"duration_days": days,
+		},
+	}, nil
+}
+
+type InvoiceTypeFunction struct{}
+
+func NewInvoiceTypeFunction() *InvoiceTypeFunction {
+	return &InvoiceTypeFunction{}
+}
+
+func (f *InvoiceTypeFunction) GetName() string {
+	return "invoice_type"
+}
+
+func (f *InvoiceTypeFunction) GetDescription() string {
+	return "提取发票类型"
+}
+
+func (f *InvoiceTypeFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *InvoiceTypeFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *InvoiceTypeFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	invoiceData := input.InvoiceData["invoice"]
+	if invoiceData == nil {
+		return &FunctionOutput{Error: "invoice data not found"}, nil
+	}
+
+	invoiceMap, ok := invoiceData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "invoice data is not a map"}, nil
+	}
+
+	invoiceType := ""
+	if t, ok := invoiceMap["type"]; ok {
+		invoiceType = fmt.Sprintf("%v", t)
+	}
+
+	return &FunctionOutput{
+		Value: invoiceType,
+		Metadata: map[string]interface{}{
+			"invoice_type": invoiceType,
+		},
+	}, nil
+}
+
+type CommodityNameFunction struct{}
+
+func NewCommodityNameFunction() *CommodityNameFunction {
+	return &CommodityNameFunction{}
+}
+
+func (f *CommodityNameFunction) GetName() string {
+	return "commodity_name"
+}
+
+func (f *CommodityNameFunction) GetDescription() string {
+	return "提取发票商品名称"
+}
+
+func (f *CommodityNameFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *CommodityNameFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *CommodityNameFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	invoiceData := input.InvoiceData["invoice"]
+	if invoiceData == nil {
+		return &FunctionOutput{Error: "invoice data not found"}, nil
+	}
+
+	invoiceMap, ok := invoiceData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "invoice data is not a map"}, nil
+	}
+
+	commodityName := ""
+	if cn, ok := invoiceMap["commodity_name"]; ok {
+		commodityName = fmt.Sprintf("%v", cn)
+	}
+
+	return &FunctionOutput{
+		Value: commodityName,
+		Metadata: map[string]interface{}{
+			"commodity_name": commodityName,
+		},
+	}, nil
+}
+
+type MerchantTypeFunction struct{}
+
+func NewMerchantTypeFunction() *MerchantTypeFunction {
+	return &MerchantTypeFunction{}
+}
+
+func (f *MerchantTypeFunction) GetName() string {
+	return "merchant_type"
+}
+
+func (f *MerchantTypeFunction) GetDescription() string {
+	return "提取商户类型"
+}
+
+func (f *MerchantTypeFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *MerchantTypeFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *MerchantTypeFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	invoiceData := input.InvoiceData["invoice"]
+	if invoiceData == nil {
+		return &FunctionOutput{Error: "invoice data not found"}, nil
+	}
+
+	invoiceMap, ok := invoiceData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "invoice data is not a map"}, nil
+	}
+
+	merchantType := ""
+	if mt, ok := invoiceMap["merchant_type"]; ok {
+		merchantType = fmt.Sprintf("%v", mt)
+	}
+
+	return &FunctionOutput{
+		Value: merchantType,
+		Metadata: map[string]interface{}{
+			"merchant_type": merchantType,
+		},
+	}, nil
+}
+
+type ReimbursementTypeFunction struct{}
+
+func NewReimbursementTypeFunction() *ReimbursementTypeFunction {
+	return &ReimbursementTypeFunction{}
+}
+
+func (f *ReimbursementTypeFunction) GetName() string {
+	return "reimbursement_type"
+}
+
+func (f *ReimbursementTypeFunction) GetDescription() string {
+	return "提取报销类型"
+}
+
+func (f *ReimbursementTypeFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *ReimbursementTypeFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *ReimbursementTypeFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	reimbData := input.InvoiceData["reimbursement"]
+	if reimbData == nil {
+		return &FunctionOutput{Error: "reimbursement data not found"}, nil
+	}
+
+	reimbMap, ok := reimbData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "reimbursement data is not a map"}, nil
+	}
+
+	reimbType := ""
+	if t, ok := reimbMap["type"]; ok {
+		reimbType = fmt.Sprintf("%v", t)
+	}
+
+	return &FunctionOutput{
+		Value: reimbType,
+		Metadata: map[string]interface{}{
+			"reimbursement_type": reimbType,
+		},
+	}, nil
+}
+
+type ApplicantLevelFunction struct{}
+
+func NewApplicantLevelFunction() *ApplicantLevelFunction {
+	return &ApplicantLevelFunction{}
+}
+
+func (f *ApplicantLevelFunction) GetName() string {
+	return "applicant_level"
+}
+
+func (f *ApplicantLevelFunction) GetDescription() string {
+	return "提取申请人级别"
+}
+
+func (f *ApplicantLevelFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *ApplicantLevelFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *ApplicantLevelFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	reimbData := input.InvoiceData["reimbursement"]
+	if reimbData == nil {
+		return &FunctionOutput{Error: "reimbursement data not found"}, nil
+	}
+
+	reimbMap, ok := reimbData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "reimbursement data is not a map"}, nil
+	}
+
+	level := ""
+	if l, ok := reimbMap["applicant_level"]; ok {
+		level = fmt.Sprintf("%v", l)
+	}
+
+	return &FunctionOutput{
+		Value: level,
+		Metadata: map[string]interface{}{
+			"applicant_level": level,
+		},
+	}, nil
+}
+
+type InvoiceDateValidityFunction struct{}
+
+func NewInvoiceDateValidityFunction() *InvoiceDateValidityFunction {
+	return &InvoiceDateValidityFunction{}
+}
+
+func (f *InvoiceDateValidityFunction) GetName() string {
+	return "invoice_date_validity"
+}
+
+func (f *InvoiceDateValidityFunction) GetDescription() string {
+	return "校验开票日期是否在有效范围内"
+}
+
+func (f *InvoiceDateValidityFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{
+			{
+				Name:        "max_days_ago",
+				Type:        "number",
+				Label:       "最大天数",
+				Required:    true,
+				Default:     365,
+				Description: "开票日期距今天最大允许天数",
+			},
+		},
+	}
+}
+
+func (f *InvoiceDateValidityFunction) Validate(config map[string]interface{}) error {
+	if _, ok := config["max_days_ago"]; !ok {
+		return fmt.Errorf("max_days_ago is required")
+	}
+	return nil
+}
+
+func (f *InvoiceDateValidityFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	maxDaysAgo := 365.0
+	if mda, ok := input.Config["max_days_ago"]; ok {
+		switch v := mda.(type) {
+		case float64:
+			maxDaysAgo = v
+		case int:
+			maxDaysAgo = float64(v)
+		}
+	}
+
+	invoiceData := input.InvoiceData["invoice"]
+	if invoiceData == nil {
+		return &FunctionOutput{Error: "invoice data not found"}, nil
+	}
+
+	invoiceMap, ok := invoiceData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "invoice data is not a map"}, nil
+	}
+
+	d, ok := invoiceMap["date"]
+	if !ok {
+		return &FunctionOutput{Value: false, Error: "invoice date not found"}, nil
+	}
+
+	invoiceDate, err := parseDate(d)
+	if err != nil {
+		return &FunctionOutput{Value: false, Error: err.Error()}, nil
+	}
+
+	now := time.Now()
+	daysAgo := now.Sub(invoiceDate).Hours() / 24
+
+	isValid := daysAgo >= 0 && daysAgo <= maxDaysAgo
+
+	return &FunctionOutput{
+		Value: isValid,
+		Metadata: map[string]interface{}{
+			"invoice_date": invoiceDate.Format("2006-01-02"),
+			"days_ago":     daysAgo,
+			"max_days_ago": maxDaysAgo,
+			"is_valid":     isValid,
+		},
+	}, nil
+}
+
+type InvoiceAmountRangeFunction struct{}
+
+func NewInvoiceAmountRangeFunction() *InvoiceAmountRangeFunction {
+	return &InvoiceAmountRangeFunction{}
+}
+
+func (f *InvoiceAmountRangeFunction) GetName() string {
+	return "invoice_amount_range"
+}
+
+func (f *InvoiceAmountRangeFunction) GetDescription() string {
+	return "检查发票金额是否在合理范围内"
+}
+
+func (f *InvoiceAmountRangeFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{
+			{
+				Name:        "min_amount",
+				Type:        "number",
+				Label:       "最小金额",
+				Required:    true,
+				Default:     0.01,
+				Description: "发票最小金额",
+			},
+			{
+				Name:        "max_amount",
+				Type:        "number",
+				Label:       "最大金额",
+				Required:    true,
+				Default:     100000.00,
+				Description: "发票最大金额",
+			},
+		},
+	}
+}
+
+func (f *InvoiceAmountRangeFunction) Validate(config map[string]interface{}) error {
+	if _, ok := config["min_amount"]; !ok {
+		return fmt.Errorf("min_amount is required")
+	}
+	if _, ok := config["max_amount"]; !ok {
+		return fmt.Errorf("max_amount is required")
+	}
+	return nil
+}
+
+func (f *InvoiceAmountRangeFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	minAmount := 0.01
+	maxAmount := 100000.00
+
+	if ma, ok := input.Config["min_amount"]; ok {
+		switch v := ma.(type) {
+		case float64:
+			minAmount = v
+		case int:
+			minAmount = float64(v)
+		}
+	}
+
+	if ma, ok := input.Config["max_amount"]; ok {
+		switch v := ma.(type) {
+		case float64:
+			maxAmount = v
+		case int:
+			maxAmount = float64(v)
+		}
+	}
+
+	invoiceData := input.InvoiceData["invoice"]
+	if invoiceData == nil {
+		return &FunctionOutput{Error: "invoice data not found"}, nil
+	}
+
+	invoiceMap, ok := invoiceData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "invoice data is not a map"}, nil
+	}
+
+	amount := 0.0
+	if a, ok := invoiceMap["amount"]; ok {
+		switch v := a.(type) {
+		case float64:
+			amount = v
+		case int:
+			amount = float64(v)
+		case string:
+			fmt.Sscanf(v, "%f", &amount)
+		}
+	}
+
+	isValid := amount >= minAmount && amount <= maxAmount
+
+	return &FunctionOutput{
+		Value: isValid,
+		Metadata: map[string]interface{}{
+			"amount":     amount,
+			"min_amount": minAmount,
+			"max_amount": maxAmount,
+			"is_valid":   isValid,
+		},
+	}, nil
+}
+
+type InvoicePriceFunction struct{}
+
+func NewInvoicePriceFunction() *InvoicePriceFunction {
+	return &InvoicePriceFunction{}
+}
+
+func (f *InvoicePriceFunction) GetName() string {
+	return "invoice_price"
+}
+
+func (f *InvoicePriceFunction) GetDescription() string {
+	return "提取发票单价"
+}
+
+func (f *InvoicePriceFunction) GetConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []FieldConfig{},
+	}
+}
+
+func (f *InvoicePriceFunction) Validate(config map[string]interface{}) error {
+	return nil
+}
+
+func (f *InvoicePriceFunction) Execute(ctx context.Context, input *FunctionInput) (*FunctionOutput, error) {
+	invoiceData := input.InvoiceData["invoice"]
+	if invoiceData == nil {
+		return &FunctionOutput{Error: "invoice data not found"}, nil
+	}
+
+	invoiceMap, ok := invoiceData.(map[string]interface{})
+	if !ok {
+		return &FunctionOutput{Error: "invoice data is not a map"}, nil
+	}
+
+	price := 0.0
+	if p, ok := invoiceMap["price"]; ok {
+		switch v := p.(type) {
+		case float64:
+			price = v
+		case int:
+			price = float64(v)
+		case string:
+			fmt.Sscanf(v, "%f", &price)
+		}
+	}
+
+	return &FunctionOutput{
+		Value: price,
+		Metadata: map[string]interface{}{
+			"price": price,
+		},
+	}, nil
+}

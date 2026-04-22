@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	VectorDimension = 768
+	VectorDimension = 1024
 )
 
 // VectorData 向量数据类型
@@ -58,7 +58,7 @@ func (v VectorData) Value() (driver.Value, error) {
 }
 
 func (v VectorData) GormDataType() string {
-	return "vector(768)"
+	return "vector(1024)"
 }
 
 func (v VectorData) GormValue(ctx context.Context, db *gorm.DB) clause.Expr {
@@ -88,7 +88,7 @@ type DocumentModel struct {
 	ChunkID      string     `gorm:"column:chunk_id;index"`
 	ChunkIndex   int        `gorm:"column:chunk_index"`
 	ChunkContent string     `gorm:"column:chunk_content"`
-	Embedding    VectorData `gorm:"column:embedding;type:vector(768)"`
+	Embedding    VectorData `gorm:"column:embedding;type:vector(1024)"`
 	CreatedAt    time.Time  `gorm:"column:created_at"`
 	UpdatedAt    time.Time  `gorm:"column:updated_at"`
 }

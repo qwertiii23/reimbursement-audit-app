@@ -70,10 +70,13 @@ type RuleValidationResult struct {
 type RAGAnalysisResultResponse struct {
 	Query         string             `json:"query"`
 	Content       string             `json:"content"`
+	Conclusion    string             `json:"conclusion"`
+	Reasoning     string             `json:"reasoning"`
 	Confidence    float64            `json:"confidence"`
 	References    []*VectorReference `json:"references"`
 	Analysis      string             `json:"analysis"`
 	ExecutionTime int64              `json:"execution_time"`
+	Suggestions   []string           `json:"suggestions"`
 }
 
 // VectorReference 向量检索引用响应
@@ -157,9 +160,12 @@ func NewAuditResultResponse(auditResult *audit.AuditResult) *AuditResultResponse
 		response.RAGResults = &RAGAnalysisResultResponse{
 			Query:         auditResult.RAGResults.Query,
 			Content:       auditResult.RAGResults.Content,
+			Conclusion:    auditResult.RAGResults.Conclusion,
+			Reasoning:     auditResult.RAGResults.Reasoning,
 			Confidence:    auditResult.RAGResults.Confidence,
 			Analysis:      auditResult.RAGResults.Analysis,
 			ExecutionTime: auditResult.RAGResults.ExecutionTime,
+			Suggestions:   auditResult.RAGResults.Suggestions,
 		}
 
 		if auditResult.RAGResults.References != nil {

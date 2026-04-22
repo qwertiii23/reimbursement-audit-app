@@ -42,32 +42,28 @@
       <el-table :data="featureList" v-loading="loading" border stripe>
         <el-table-column prop="id" label="特征ID" width="200" show-overflow-tooltip />
         <el-table-column prop="name" label="特征名称" width="150" />
-        <el-table-column prop="code" label="特征编码" width="150" />
+        <el-table-column prop="code" label="特征编码" width="180" />
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column label="特征类型" width="120">
+        <el-table-column label="特征类型" width="100">
           <template #default="{ row }">
             <el-tag :type="getTypeTag(row.type)">
               {{ getTypeText(row.type) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="值类型" width="100">
+        <el-table-column label="值类型" width="80">
           <template #default="{ row }">
             <el-tag :type="row.value_type === 'list' ? 'warning' : 'info'">
               {{ row.value_type === 'list' ? '列表' : '单值' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="分类" width="100">
+        <el-table-column label="分类" width="80">
           <template #default="{ row }">
             {{ getCategoryText(row.category) }}
           </template>
         </el-table-column>
-        <el-table-column label="值数量" width="80" align="center">
-          <template #default="{ row }">
-            {{ row.values.length }}
-          </template>
-        </el-table-column>
+        <el-table-column prop="function_name" label="特征函数" width="180" show-overflow-tooltip />
         <el-table-column label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'info'">
@@ -75,7 +71,6 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
@@ -164,6 +159,28 @@
           <el-input v-model="featureForm.description" type="textarea" :rows="2" placeholder="请输入特征描述" />
         </el-form-item>
 
+        <el-divider content-position="left">特征函数配置</el-divider>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="特征函数">
+              <el-select v-model="featureForm.function_name" placeholder="请选择特征函数" clearable style="width: 100%">
+                <el-option v-for="fn in availableFunctions" :key="fn.name" :label="fn.description" :value="fn.name" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="函数配置" v-if="featureForm.function_name">
+          <el-input
+            v-model="functionConfigStr"
+            type="textarea"
+            :rows="4"
+            placeholder='请输入JSON格式配置，例如: {"max_days_ago": 365}'
+          />
+          <div v-if="configError" style="color: #f56c6c; font-size: 12px; margin-top: 4px">{{ configError }}</div>
+        </el-form-item>
+
         <el-divider content-position="left">特征值配置</el-divider>
 
         <div v-for="(value, index) in featureForm.values" :key="index" class="value-item">
@@ -200,7 +217,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 
@@ -216,6 +233,26 @@ const loading = ref(false)
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增特征')
 const featureFormRef = ref(null)
+const configError = ref('')
+
+const availableFunctions = ref([
+  { name: 'reimbursement_total_amount', description: '报销总金额' },
+  { name: 'invoice_amount', description: '发票金额' },
+  { name: 'invoice_days_from_today', description: '发票距今天数' },
+  { name: 'trip_duration', description: '出差天数' },
+  { name: 'invoice_type', description: '发票类型' },
+  { name: 'commodity_name', description: '商品名称' },
+  { name: 'merchant_type', description: '商户类型' },
+  { name: 'reimbursement_type', description: '报销类型' },
+  { name: 'applicant_level', description: '申请人级别' },
+  { name: 'invoice_date_validity', description: '开票日期有效性' },
+  { name: 'invoice_amount_range', description: '发票金额范围' },
+  { name: 'invoice_price', description: '发票单价' },
+  { name: 'detect_photoshop', description: 'P图检测' },
+  { name: 'image_quality', description: '图片质量检测' },
+  { name: 'invoice_code_length', description: '发票代码长度检测' },
+  { name: 'invoice_fraud_detection', description: '发票舞弊检测' }
+])
 
 const pagination = reactive({
   page: 1,
@@ -232,7 +269,20 @@ const featureForm = reactive({
   value_type: 'single',
   category: 'other',
   enabled: true,
+  function_name: '',
+  function_config: {},
   values: []
+})
+
+const functionConfigStr = ref('{}')
+
+watch(functionConfigStr, (val) => {
+  try {
+    featureForm.function_config = JSON.parse(val)
+    configError.value = ''
+  } catch (e) {
+    configError.value = 'JSON格式错误'
+  }
 })
 
 const rules = {
@@ -246,15 +296,16 @@ const rules = {
 const fetchFeatures = async () => {
   loading.value = true
   try {
-    const params = {
+    const params = new URLSearchParams({
       page: pagination.page,
-      size: pagination.pageSize,
-      name: searchForm.name,
-      code: searchForm.code,
-      category: searchForm.category,
-      enabled: searchForm.enabled
-    }
-    const res = await fetch(`/api/v1/ruleengine/features?page=${params.page}&size=${params.size}&name=${params.name}&code=${params.code}&category=${params.category}&enabled=${params.enabled}`)
+      size: pagination.pageSize
+    })
+    if (searchForm.name) params.append('name', searchForm.name)
+    if (searchForm.code) params.append('code', searchForm.code)
+    if (searchForm.category) params.append('category', searchForm.category)
+    if (searchForm.enabled !== null && searchForm.enabled !== '') params.append('enabled', searchForm.enabled)
+
+    const res = await fetch(`/api/v1/engine/features?${params}`)
     const data = await res.json()
     if (data.code === 200) {
       featureList.value = data.data.features || []
@@ -295,13 +346,16 @@ const handleEdit = (row) => {
     id: row.id,
     name: row.name,
     code: row.code,
-    description: row.description,
+    description: row.description || '',
     type: row.type,
     value_type: row.value_type,
     category: row.category,
     enabled: row.enabled,
-    values: JSON.parse(JSON.stringify(row.values))
+    function_name: row.function_name || '',
+    function_config: row.function_config || {},
+    values: JSON.parse(JSON.stringify(row.values || []))
   })
+  functionConfigStr.value = JSON.stringify(featureForm.function_config, null, 2)
   dialogVisible.value = true
 }
 
@@ -313,7 +367,7 @@ const handleDelete = async (row) => {
       type: 'warning'
     })
 
-    const res = await fetch(`/api/v1/ruleengine/features/${row.id}`, {
+    const res = await fetch(`/api/v1/engine/features/${row.id}`, {
       method: 'DELETE'
     })
     const data = await res.json()
@@ -333,7 +387,7 @@ const handleDelete = async (row) => {
 const handleToggleEnable = async (row) => {
   try {
     const action = row.enabled ? 'disable' : 'enable'
-    const res = await fetch(`/api/v1/ruleengine/features/${row.id}/${action}`, {
+    const res = await fetch(`/api/v1/engine/features/${row.id}/${action}`, {
       method: 'PUT'
     })
     const data = await res.json()
@@ -353,16 +407,34 @@ const handleSubmit = async () => {
 
   await featureFormRef.value.validate(async (valid) => {
     if (valid) {
+      if (configError.value) {
+        ElMessage.error('函数配置JSON格式错误')
+        return
+      }
+
       try {
-        const url = featureForm.id ? `/api/v1/ruleengine/features/${featureForm.id}` : '/api/v1/ruleengine/features'
+        const url = featureForm.id ? `/api/v1/engine/features/${featureForm.id}` : '/api/v1/engine/features'
         const method = featureForm.id ? 'PUT' : 'POST'
+
+        const body = {
+          name: featureForm.name,
+          code: featureForm.code,
+          description: featureForm.description,
+          type: featureForm.type,
+          value_type: featureForm.value_type,
+          category: featureForm.category,
+          enabled: featureForm.enabled,
+          function_name: featureForm.function_name,
+          function_config: featureForm.function_config,
+          values: featureForm.values
+        }
 
         const res = await fetch(url, {
           method,
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(featureForm)
+          body: JSON.stringify(body)
         })
         const data = await res.json()
 
@@ -403,8 +475,12 @@ const resetForm = () => {
     value_type: 'single',
     category: 'other',
     enabled: true,
+    function_name: '',
+    function_config: {},
     values: []
   })
+  functionConfigStr.value = '{}'
+  configError.value = ''
 }
 
 const handleSizeChange = (size) => {

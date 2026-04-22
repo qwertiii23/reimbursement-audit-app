@@ -386,3 +386,129 @@ func (h *RuleEngineHandler) TestRules(c *gin.Context) {
 		"total":   len(results),
 	})
 }
+
+func (h *RuleEngineHandler) CreateFeature(c *gin.Context) {
+	ctx := context.Background()
+
+	var req ruleenginedomain.CreateFeatureRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.LogError(c, "请求参数错误", "error", err.Error())
+		response.ErrorResponse(c, response.CodeInvalidParams, "请求参数错误")
+		return
+	}
+
+	feature, err := h.service.CreateFeature(ctx, &req)
+	if err != nil {
+		middleware.LogError(c, "创建特征失败", "error", err.Error())
+		response.ErrorResponse(c, response.CodeInternalError, "创建特征失败")
+		return
+	}
+
+	response.SuccessResponse(c, gin.H{
+		"feature": feature,
+	})
+}
+
+func (h *RuleEngineHandler) UpdateFeature(c *gin.Context) {
+	ctx := context.Background()
+
+	featureId := c.Param("id")
+	if featureId == "" {
+		response.ErrorResponse(c, response.CodeInvalidParams, "特征ID不能为空")
+		return
+	}
+
+	var req ruleenginedomain.CreateFeatureRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.LogError(c, "请求参数错误", "error", err.Error())
+		response.ErrorResponse(c, response.CodeInvalidParams, "请求参数错误")
+		return
+	}
+
+	updateReq := &ruleenginedomain.UpdateFeatureRequest{
+		ID:             featureId,
+		Name:           req.Name,
+		Code:           req.Code,
+		Type:           req.Type,
+		ValueType:      req.ValueType,
+		Category:       req.Category,
+		Enabled:        req.Enabled,
+		FunctionName:   req.FunctionName,
+		FunctionConfig: req.FunctionConfig,
+		Values:         req.Values,
+	}
+
+	feature, err := h.service.UpdateFeature(ctx, updateReq)
+	if err != nil {
+		middleware.LogError(c, "更新特征失败", "error", err.Error())
+		response.ErrorResponse(c, response.CodeInternalError, "更新特征失败")
+		return
+	}
+
+	response.SuccessResponse(c, gin.H{
+		"feature": feature,
+	})
+}
+
+func (h *RuleEngineHandler) DeleteFeature(c *gin.Context) {
+	ctx := context.Background()
+
+	featureId := c.Param("id")
+	if featureId == "" {
+		response.ErrorResponse(c, response.CodeInvalidParams, "特征ID不能为空")
+		return
+	}
+
+	err := h.service.DeleteFeature(ctx, featureId)
+	if err != nil {
+		middleware.LogError(c, "删除特征失败", "error", err.Error())
+		response.ErrorResponse(c, response.CodeInternalError, "删除特征失败")
+		return
+	}
+
+	response.SuccessResponse(c, gin.H{
+		"message": "删除成功",
+	})
+}
+
+func (h *RuleEngineHandler) EnableFeature(c *gin.Context) {
+	ctx := context.Background()
+
+	featureId := c.Param("id")
+	if featureId == "" {
+		response.ErrorResponse(c, response.CodeInvalidParams, "特征ID不能为空")
+		return
+	}
+
+	err := h.service.EnableFeature(ctx, featureId)
+	if err != nil {
+		middleware.LogError(c, "启用特征失败", "error", err.Error())
+		response.ErrorResponse(c, response.CodeInternalError, "启用特征失败")
+		return
+	}
+
+	response.SuccessResponse(c, gin.H{
+		"message": "启用成功",
+	})
+}
+
+func (h *RuleEngineHandler) DisableFeature(c *gin.Context) {
+	ctx := context.Background()
+
+	featureId := c.Param("id")
+	if featureId == "" {
+		response.ErrorResponse(c, response.CodeInvalidParams, "特征ID不能为空")
+		return
+	}
+
+	err := h.service.DisableFeature(ctx, featureId)
+	if err != nil {
+		middleware.LogError(c, "禁用特征失败", "error", err.Error())
+		response.ErrorResponse(c, response.CodeInternalError, "禁用特征失败")
+		return
+	}
+
+	response.SuccessResponse(c, gin.H{
+		"message": "禁用成功",
+	})
+}

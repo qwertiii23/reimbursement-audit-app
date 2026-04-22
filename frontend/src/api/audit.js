@@ -22,6 +22,13 @@ export const getAuditResult = (auditId) => {
   })
 }
 
+export const getAuditByReimbursementId = (reimbursementId) => {
+  return request({
+    url: `/reimbursement/${reimbursementId}/audit-report`,
+    method: 'get'
+  })
+}
+
 export const retryAudit = (auditId) => {
   return request({
     url: `/audit/${auditId}/retry`,
@@ -39,15 +46,17 @@ export const manualAudit = (auditId, action, reason) => {
 
 export const getFlowLogsByReimbursementId = (reimbursementId) => {
   return request({
-    url: `/audit/flow-logs/reimbursement/${reimbursementId}`,
-    method: 'get'
+    url: '/audit/flow-logs',
+    method: 'get',
+    params: { reimbursement_id: reimbursementId }
   })
 }
 
 export const getFlowLogsByAuditId = (auditId) => {
   return request({
-    url: `/audit/flow-logs/audit/${auditId}`,
-    method: 'get'
+    url: '/audit/flow-logs',
+    method: 'get',
+    params: { audit_id: auditId }
   })
 }
 

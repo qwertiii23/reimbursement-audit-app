@@ -3,10 +3,10 @@
     <el-card class="filter-card">
       <el-form :inline="true" :model="filters" class="filter-form">
         <el-form-item label="审核状态">
-          <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 150px;">
-            <el-option label="待人工审核" value="pending_manual" />
-            <el-option label="审核通过" value="approved" />
-            <el-option label="审核驳回" value="rejected" />
+          <el-select v-model="filters.workflowStatus" placeholder="全部状态" clearable style="width: 150px;">
+            <el-option label="待人工审核" value="待人工审核" />
+            <el-option label="人工审核通过" value="人工审核通过" />
+            <el-option label="人工审核驳回" value="人工审核驳回" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -18,57 +18,50 @@
 
     <el-card class="table-card">
       <el-table :data="audits" v-loading="loading" stripe>
-        <el-table-column prop="id" label="审核ID" width="200">
-          <template #default="{ row }">
-            <el-tooltip :content="row.id" placement="top">
-              <span class="id-text">{{ row.id.substring(0, 12) }}...</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-        <el-table-column prop="reimbursement_id" label="报销单ID" width="200">
-          <template #default="{ row }">
-            <el-tooltip :content="row.reimbursement_id" placement="top">
-              <span class="id-text">{{ row.reimbursement_id.substring(0, 12) }}...</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
         <el-table-column prop="reimbursement_title" label="报销单标题" min-width="150" />
         <el-table-column prop="amount" label="金额" width="120">
           <template #default="{ row }">
             ¥{{ row.amount?.toFixed(2) }}
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="120">
+        <el-table-column prop="workflow_status" label="审核状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">
-              {{ getStatusText(row.status) }}
+            <el-tag :type="getStatusType(row.workflow_status)">
+              {{ row.workflow_status }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180" />
+        <el-table-column prop="ai_conclusion" label="AI审核结论" width="120">
+          <template #default="{ row }">
+            <el-tag v-if="row.ai_conclusion === '通过'" type="success">通过</el-tag>
+            <el-tag v-else-if="row.ai_conclusion === '驳回'" type="danger">驳回</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="提交时间" width="180" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="viewDetail(row.id)">
-              查看
+            <el-button type="primary" link size="small" @click="viewDetail(row.reimbursement_id)">
+              查看详情
             </el-button>
-            <el-button
-              v-if="row.status === 'pending_manual'"
-              type="success"
-              link
-              size="small"
-              @click="handleAudit(row.id, 'pass')"
-            >
-              通过
-            </el-button>
-            <el-button
-              v-if="row.status === 'pending_manual'"
-              type="danger"
-              link
-              size="small"
-              @click="handleAudit(row.id, 'reject')"
-            >
-              驳回
-            </el-button>
+            <template v-if="canManualAudit && row.workflow_status === '待人工审核'">
+              <el-button
+                type="success"
+                link
+                size="small"
+                @click="handleAudit(row.audit_id, 'pass')"
+              >
+                通过
+              </el-button>
+              <el-button
+                type="danger"
+                link
+                size="small"
+                @click="handleAudit(row.audit_id, 'reject')"
+              >
+                驳回
+              </el-button>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -115,23 +108,27 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { manualAudit } from '@/api/audit'
+import { ElMessage } from 'element-plus'
+import { manualAudit, getAuditByReimbursementId } from '@/api/audit'
 import { getReimbursementsByUser } from '@/api/reimbursement'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
+const canManualAudit = computed(() => userStore.canManualAudit)
 
 const loading = ref(false)
 const auditing = ref(false)
 const showAuditDialog = ref(false)
 const auditAction = ref('pass')
+const currentAuditId = ref('')
 
 const audits = ref([])
 
 const filters = reactive({
-  status: ''
+  workflowStatus: '待人工审核'
 })
 
 const pagination = reactive({
@@ -146,38 +143,48 @@ const auditForm = reactive({
 
 const getStatusType = (status) => {
   const typeMap = {
-    'pending': 'warning',
-    'pending_manual': 'primary',
-    'approved': 'success',
-    'rejected': 'danger'
+    '待人工审核': 'primary',
+    '人工审核通过': 'success',
+    '人工审核驳回': 'danger'
   }
   return typeMap[status] || 'info'
-}
-
-const getStatusText = (status) => {
-  const textMap = {
-    'pending': '审核中',
-    'pending_manual': '待人工审核',
-    'approved': '已通过',
-    'rejected': '已驳回'
-  }
-  return textMap[status] || status
 }
 
 const loadAudits = async () => {
   loading.value = true
   try {
     const response = await getReimbursementsByUser('all', pagination.page, pagination.pageSize)
-    const items = response.data?.items || []
-    audits.value = items.filter(item => item.audit_id).map(item => ({
-      id: item.audit_id,
-      reimbursement_id: item.id,
-      reimbursement_title: item.title,
-      amount: item.amount,
-      status: item.status,
-      created_at: item.created_at
-    }))
-    pagination.total = audits.value.length
+    const items = response.data?.list || []
+    
+    const auditPromises = items
+      .filter(item => item.audit_id)
+      .map(async item => {
+        try {
+          const auditRes = await getAuditByReimbursementId(item.id)
+          const auditData = auditRes.data
+          return {
+            audit_id: item.audit_id,
+            reimbursement_id: item.id,
+            reimbursement_title: item.title,
+            amount: item.amount,
+            workflow_status: auditData?.workflow_status || '',
+            ai_conclusion: auditData?.rag_pass ? '通过' : (auditData?.rag_pass === false ? '驳回' : ''),
+            created_at: item.created_at
+          }
+        } catch (e) {
+          return null
+        }
+      })
+    
+    const auditResults = (await Promise.all(auditPromises)).filter(Boolean)
+    
+    let filtered = auditResults
+    if (filters.workflowStatus) {
+      filtered = auditResults.filter(a => a.workflow_status === filters.workflowStatus)
+    }
+    
+    audits.value = filtered
+    pagination.total = filtered.length
   } catch (error) {
     ElMessage.error('加载审核列表失败')
   } finally {
@@ -186,28 +193,31 @@ const loadAudits = async () => {
 }
 
 const resetFilters = () => {
-  filters.status = ''
+  filters.workflowStatus = '待人工审核'
   pagination.page = 1
   loadAudits()
 }
 
-const viewDetail = (id) => {
-  router.push(`/audit/${id}`)
+const viewDetail = (reimbursementId) => {
+  router.push(`/reimbursement/${reimbursementId}`)
 }
 
-const handleAudit = async (id, action) => {
+const handleAudit = (auditId, action) => {
+  currentAuditId.value = auditId
   auditAction.value = action
   auditForm.reason = ''
   showAuditDialog.value = true
 }
 
 const confirmAudit = async () => {
-  const auditId = audits.value.find(a => a.status === 'pending_manual')?.id
-  if (!auditId) return
+  if (auditAction.value === 'reject' && !auditForm.reason.trim()) {
+    ElMessage.warning('请输入驳回原因')
+    return
+  }
 
   auditing.value = true
   try {
-    await manualAudit(auditId, auditAction.value, auditForm.reason)
+    await manualAudit(currentAuditId.value, auditAction.value, auditForm.reason)
     ElMessage.success('审核成功')
     showAuditDialog.value = false
     loadAudits()
@@ -243,43 +253,9 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
-.filter-form :deep(.el-form-item__label) {
-  font-weight: 500;
-  color: #2c3e50;
-}
-
 .pagination {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
-}
-
-:deep(.el-table) {
-  font-size: 14px;
-}
-
-:deep(.el-table th) {
-  background-color: #f5f7fa;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-:deep(.el-dialog__body) {
-  padding: 24px;
-}
-
-:deep(.el-form-item__label) {
-  font-weight: 500;
-}
-
-.id-text {
-  cursor: pointer;
-  color: #409eff;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-}
-
-.id-text:hover {
-  text-decoration: underline;
 }
 </style>

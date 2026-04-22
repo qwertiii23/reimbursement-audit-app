@@ -100,6 +100,9 @@ func (s *serverImpl) RegisterRoutes() {
 	// 注册日志中间件，用于将带有traceId的logger注入到Gin上下文中
 	s.engine.Use(middleware.LoggerMiddleware(loggerImpl))
 
+	// 注册JWT中间件
+	s.engine.Use(middleware.JWTMiddleware())
+
 	// 创建logger实例
 	loggerInstance, _ := logger.NewLogger(logger.DefaultConfig())
 
@@ -217,6 +220,66 @@ func (s *serverImpl) RegisterRoutes() {
 		loggerInstance.Error("注册发票舞弊检测特征函数失败", logger.NewField("error", err.Error()))
 	}
 
+	reimbursementTotalAmountFn := featurefunction.NewReimbursementTotalAmountFunction()
+	if err := featureFunctionRegistry.Register(reimbursementTotalAmountFn); err != nil {
+		loggerInstance.Error("注册报销总金额特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	invoiceAmountFn := featurefunction.NewInvoiceAmountFunction()
+	if err := featureFunctionRegistry.Register(invoiceAmountFn); err != nil {
+		loggerInstance.Error("注册发票金额特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	invoiceDaysFromTodayFn := featurefunction.NewInvoiceDaysFromTodayFunction()
+	if err := featureFunctionRegistry.Register(invoiceDaysFromTodayFn); err != nil {
+		loggerInstance.Error("注册发票距今天数特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	tripDurationFn := featurefunction.NewTripDurationFunction()
+	if err := featureFunctionRegistry.Register(tripDurationFn); err != nil {
+		loggerInstance.Error("注册出差天数特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	invoiceTypeFn := featurefunction.NewInvoiceTypeFunction()
+	if err := featureFunctionRegistry.Register(invoiceTypeFn); err != nil {
+		loggerInstance.Error("注册发票类型特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	commodityNameFn := featurefunction.NewCommodityNameFunction()
+	if err := featureFunctionRegistry.Register(commodityNameFn); err != nil {
+		loggerInstance.Error("注册商品名称特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	merchantTypeFn := featurefunction.NewMerchantTypeFunction()
+	if err := featureFunctionRegistry.Register(merchantTypeFn); err != nil {
+		loggerInstance.Error("注册商户类型特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	reimbursementTypeFn := featurefunction.NewReimbursementTypeFunction()
+	if err := featureFunctionRegistry.Register(reimbursementTypeFn); err != nil {
+		loggerInstance.Error("注册报销类型特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	applicantLevelFn := featurefunction.NewApplicantLevelFunction()
+	if err := featureFunctionRegistry.Register(applicantLevelFn); err != nil {
+		loggerInstance.Error("注册申请人级别特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	invoiceDateValidityFn := featurefunction.NewInvoiceDateValidityFunction()
+	if err := featureFunctionRegistry.Register(invoiceDateValidityFn); err != nil {
+		loggerInstance.Error("注册开票日期有效性特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	invoiceAmountRangeFn := featurefunction.NewInvoiceAmountRangeFunction()
+	if err := featureFunctionRegistry.Register(invoiceAmountRangeFn); err != nil {
+		loggerInstance.Error("注册发票金额范围特征函数失败", logger.NewField("error", err.Error()))
+	}
+
+	invoicePriceFn := featurefunction.NewInvoicePriceFunction()
+	if err := featureFunctionRegistry.Register(invoicePriceFn); err != nil {
+		loggerInstance.Error("注册发票单价特征函数失败", logger.NewField("error", err.Error()))
+	}
+
 	// 创建规则引擎仓储
 	ruleEngineRepo := mysqlRepo.NewRuleEngineRepository(mysqlClient, loggerInstance)
 
@@ -273,6 +336,11 @@ func (s *serverImpl) RegisterRoutes() {
 	s.engine.GET("/api/v1/engine/rules/:id", ruleEngineHandler.GetRuleByID)
 	s.engine.POST("/api/v1/engine/test", ruleEngineHandler.TestRules)
 	s.engine.GET("/api/v1/engine/features", ruleEngineHandler.GetFeatures)
+	s.engine.POST("/api/v1/engine/features", ruleEngineHandler.CreateFeature)
+	s.engine.PUT("/api/v1/engine/features/:id", ruleEngineHandler.UpdateFeature)
+	s.engine.DELETE("/api/v1/engine/features/:id", ruleEngineHandler.DeleteFeature)
+	s.engine.PUT("/api/v1/engine/features/:id/enable", ruleEngineHandler.EnableFeature)
+	s.engine.PUT("/api/v1/engine/features/:id/disable", ruleEngineHandler.DisableFeature)
 
 	// 注册特征函数相关路由
 	s.engine.GET("/api/v1/engine/functions", featureFunctionHandler.ListFunctions)

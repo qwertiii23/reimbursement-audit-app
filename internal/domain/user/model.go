@@ -3,15 +3,15 @@ package user
 import "time"
 
 type User struct {
-	ID        string    `json:"id" gorm:"primaryKey;type:varchar(36)"`
-	Username  string    `json:"username" gorm:"type:varchar(50);uniqueIndex;not null"`
-	Password  string    `json:"-" gorm:"type:varchar(255);not null"`
-	Email     string    `json:"email" gorm:"type:varchar(100);uniqueIndex"`
-	RealName  string    `json:"real_name" gorm:"type:varchar(50)"`
-	Role      string    `json:"role" gorm:"type:varchar(20);not null;default:'user'"`
-	Status    string    `json:"status" gorm:"type:varchar(20);not null;default:'active'"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string     `json:"id" gorm:"primaryKey;type:varchar(36)"`
+	Username  string     `json:"username" gorm:"type:varchar(50);uniqueIndex;not null"`
+	Password  string     `json:"-" gorm:"type:varchar(255);not null"`
+	Email     string     `json:"email" gorm:"type:varchar(100);uniqueIndex"`
+	RealName  string     `json:"real_name" gorm:"type:varchar(50)"`
+	Role      string     `json:"role" gorm:"type:varchar(20);not null;default:'user'"`
+	Status    string     `json:"status" gorm:"type:varchar(20);not null;default:'active'"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 	LastLogin *time.Time `json:"last_login"`
 }
 
@@ -21,7 +21,7 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token string `json:"token"`
+	Token string    `json:"token"`
 	User  *UserInfo `json:"user"`
 }
 
@@ -34,8 +34,9 @@ type UserInfo struct {
 }
 
 const (
-	RoleAdmin  = "admin"
-	RoleUser   = "user"
+	RoleAdmin      = "admin"
+	RoleUser       = "user"
+	RoleFinance    = "finance"
 	StatusActive   = "active"
 	StatusInactive = "inactive"
 	StatusLocked   = "locked"
@@ -57,4 +58,12 @@ func (u *User) IsActive() bool {
 
 func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
+}
+
+func (u *User) IsFinance() bool {
+	return u.Role == RoleFinance
+}
+
+func (u *User) CanManualAudit() bool {
+	return u.Role == RoleAdmin || u.Role == RoleFinance
 }

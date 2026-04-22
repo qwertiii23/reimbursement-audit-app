@@ -9,9 +9,10 @@ import (
 
 func main() {
 	passwords := map[string]string{
-		"admin":  "admin123",
-		"user":   "password123",
-		"test":   "test123",
+		"admin":   "admin123",
+		"user":    "password123",
+		"test":    "test123",
+		"finance": "finance123",
 	}
 
 	for username, password := range passwords {

@@ -478,6 +478,38 @@ func (rs *RAGService) parseAuditResult(query string, response *ChatResponse, ref
 
 	content := response.Choices[0].Message.Content
 
+	type AIResponse struct {
+		Conclusion  string   `json:"conclusion"`
+		Confidence  float64  `json:"confidence"`
+		Reasoning   string   `json:"reasoning"`
+		Suggestions []string `json:"suggestions"`
+	}
+
+	var aiResp AIResponse
+	jsonContent := rs.extractJSON(content)
+	if err := json.Unmarshal([]byte(jsonContent), &aiResp); err == nil {
+		if aiResp.Conclusion == "" {
+			aiResp.Conclusion = "驳回"
+		}
+		if aiResp.Confidence == 0 {
+			aiResp.Confidence = 0.5
+		}
+		return &AnalysisResult{
+			ID:          generateAnalysisResultID(),
+			Query:       query,
+			Conclusion:  aiResp.Conclusion,
+			Reasoning:   aiResp.Reasoning,
+			Confidence:  aiResp.Confidence,
+			Suggestions: aiResp.Suggestions,
+			Data: map[string]interface{}{
+				"references_count": len(references),
+				"avg_score":        rs.calculateAverageScore(references),
+				"raw_content":      content,
+			},
+			CreatedAt: time.Now(),
+		}
+	}
+
 	confidence := rs.calculateAuditConfidence(content, references)
 
 	return &AnalysisResult{
@@ -492,6 +524,18 @@ func (rs *RAGService) parseAuditResult(query string, response *ChatResponse, ref
 		},
 		CreatedAt: time.Now(),
 	}
+}
+
+func (rs *RAGService) extractJSON(content string) string {
+	start := strings.Index(content, "{")
+	if start == -1 {
+		return "{}"
+	}
+	end := strings.LastIndex(content, "}")
+	if end == -1 || end < start {
+		return "{}"
+	}
+	return content[start : end+1]
 }
 
 // calculateAuditConfidence 计算审核置信度

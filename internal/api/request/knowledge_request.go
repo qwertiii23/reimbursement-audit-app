@@ -16,6 +16,7 @@ type UpdateFileRequest struct {
 	FileName    string `json:"file_name"`
 	Category    string `json:"category"`
 	Description string `json:"description"`
+	Status      string `json:"status"`
 }
 
 type GetFilesRequest struct {

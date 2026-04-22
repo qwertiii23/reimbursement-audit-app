@@ -224,6 +224,7 @@ func (r *AuditRepository) toDomain(model *AuditResultModel) *audit.AuditResult {
 		ID:              model.ID,
 		ReimbursementID: model.ReimbursementID,
 		Status:          audit.AuditStatus(model.Status),
+		WorkflowStatus:  audit.WorkflowStatus(model.WorkflowStatus),
 		RulePass:        model.RulePass,
 		RAGPass:         model.RAGPass,
 		FinalPass:       model.FinalPass,

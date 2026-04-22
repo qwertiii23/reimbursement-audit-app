@@ -158,6 +158,10 @@
               <el-icon><UserFilled /></el-icon>
               <span>管理员</span>
             </button>
+            <button class="demo-btn finance" @click="fillFinanceAccount">
+              <el-icon><Wallet /></el-icon>
+              <span>财务人员</span>
+            </button>
             <button class="demo-btn user" @click="fillUserAccount">
               <el-icon><User /></el-icon>
               <span>普通用户</span>
@@ -179,7 +183,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { User, Lock, Loading, ArrowRight, UserFilled, Check } from '@element-plus/icons-vue'
+import { User, Lock, Loading, ArrowRight, UserFilled, Check, Wallet } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -230,6 +234,11 @@ const handleLogin = async () => {
 const fillAdminAccount = () => {
   loginForm.username = 'admin'
   loginForm.password = 'admin123'
+}
+
+const fillFinanceAccount = () => {
+  loginForm.username = 'finance'
+  loginForm.password = 'finance123'
 }
 
 const fillUserAccount = () => {
@@ -704,7 +713,7 @@ const fillUserAccount = () => {
 
 .demo-buttons {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
